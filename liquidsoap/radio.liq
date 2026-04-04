@@ -23,8 +23,8 @@ primary = input.harbor(
   "primary",
   port=8010,
   password=harbor_password,
-  max=30.0,
-  buffer=10.0
+  max=45.0,
+  buffer=15.0
 )
 
 primary.on_connect(synchronous=false, fun (_) -> begin
@@ -42,8 +42,8 @@ secondary = input.harbor(
   "secondary",
   port=8011,
   password=harbor_password,
-  max=30.0,
-  buffer=10.0
+  max=45.0,
+  buffer=15.0
 )
 
 secondary.on_connect(synchronous=false, fun (_) -> begin
@@ -69,9 +69,12 @@ radio = fallback(
   [primary, secondary, emergency, silence]
 )
 
+# Quick fades on source switches to avoid hard cuts/clicks.
+radio = crossfade(duration=0.35, radio)
+
 # --- Output buffer ---
 # Smooth out jitter from encoding and network with a buffer
-radio = buffer(buffer=3.0, max=10.0, radio)
+radio = buffer(buffer=6.0, max=25.0, radio)
 
 # Guarantee infallible source after all processing
 radio = mksafe(radio)
