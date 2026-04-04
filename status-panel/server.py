@@ -23,10 +23,26 @@ from flask_cors import CORS
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB upload limit
 
-# CORS — allow the Appwrite Sites frontend (no wildcard default)
-CORS_ORIGIN = os.getenv("STATUS_PANEL_CORS_ORIGIN", "")
-if CORS_ORIGIN:
-    CORS(app, resources={r"/api/*": {"origins": CORS_ORIGIN.split(",")}}, supports_credentials=False)
+# CORS — allow the current and legacy Breeze Radio panel origins.
+DEFAULT_CORS_ORIGINS = {
+    "https://status.breezeradio.nl",
+    "https://broadcast-status.breezeradio.nl",
+}
+
+
+def get_cors_origins():
+    raw_origins = os.getenv("STATUS_PANEL_CORS_ORIGIN", "")
+    origins = {origin.strip() for origin in raw_origins.split(",") if origin.strip()}
+
+    if not origins:
+        origins = set(DEFAULT_CORS_ORIGINS)
+    elif "https://status.breezeradio.nl" in origins or "https://broadcast-status.breezeradio.nl" in origins:
+        origins |= DEFAULT_CORS_ORIGINS
+
+    return sorted(origins)
+
+
+CORS(app, resources={r"/api/*": {"origins": get_cors_origins()}}, supports_credentials=False)
 
 # Configuration
 ICECAST_URL = os.getenv("ICECAST_URL", "http://icecast:8000")

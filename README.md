@@ -216,7 +216,7 @@ All secrets and settings are managed via `.env`:
 | `APPWRITE_ENDPOINT` | Appwrite API endpoint |
 | `APPWRITE_PROJECT_ID` | Appwrite project ID |
 | `APPWRITE_TEAM_ID` | Appwrite team ID (only members get panel access) |
-| `STATUS_PANEL_CORS_ORIGIN` | Frontend URL for CORS (e.g. `https://status.breezeradio.nl`) |
+| `STATUS_PANEL_CORS_ORIGIN` | Frontend URL(s) for CORS, comma-separated (e.g. `https://broadcast-status.breezeradio.nl,https://status.breezeradio.nl`) |
 | `POSTHOG_API_KEY` | PostHog project API key |
 | `POSTHOG_HOST` | PostHog instance URL |
 | `POSTHOG_POLL_INTERVAL` | Stats polling interval in seconds (default: 30) |

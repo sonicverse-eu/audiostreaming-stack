@@ -244,7 +244,7 @@ if [ "${SKIP_ENV}" != "true" ]; then
     prompt APPWRITE_ENDPOINT   "Appwrite endpoint" "https://cloud.appwrite.io/v1"
     prompt APPWRITE_PROJECT_ID "Appwrite project ID" ""
     prompt APPWRITE_TEAM_ID    "Appwrite team ID (members get panel access)" ""
-    prompt STATUS_PANEL_CORS_ORIGIN "Status panel frontend URL (for CORS)" "https://status.breezeradio.nl"
+    prompt STATUS_PANEL_CORS_ORIGIN "Status panel frontend URL(s) for CORS" "https://broadcast-status.breezeradio.nl,https://status.breezeradio.nl"
 
     # PostHog
     echo ""
