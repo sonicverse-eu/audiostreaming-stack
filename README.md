@@ -63,6 +63,35 @@ https://<host>/hls/live.m3u8
 
 Adaptive with AAC 128k and MP3 128k variants.
 
+## Prerequisites
+
+### Install Docker
+
+**Ubuntu/Debian:**
+```bash
+# Install Docker Engine
+curl -fsSL https://get.docker.com | sh
+
+# Add your user to the docker group (log out and back in after)
+sudo usermod -aG docker $USER
+
+# Verify installation
+docker --version
+docker compose version
+```
+
+**macOS:**
+```bash
+# Install Docker Desktop via Homebrew
+brew install --cask docker
+
+# Or download from https://www.docker.com/products/docker-desktop/
+```
+
+**Windows:**
+
+Download and install [Docker Desktop](https://www.docker.com/products/docker-desktop/) — requires WSL 2.
+
 ## Quick Start
 
 1. **Clone and configure**
