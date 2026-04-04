@@ -180,8 +180,10 @@ def handle_harbor_state(harbor_name, is_up):
             properties={"harbor": harbor_name},
         )
 
-    other_harbor = "secondary" if harbor_name == "primary" else "primary"
-    priority = 2 if harbor_states.get(other_harbor, True) is False else 1
+    if harbor_name == "primary":
+        priority = 1
+    else:
+        priority = 2 if harbor_states.get("primary", True) is False else 1
     message = (
         f"The {harbor_name} studio input is offline. "
         f"{('Both harbors are down, so the stream is in critical failover.' if priority == 2 else 'Failover should still be carrying the stream.') }"
