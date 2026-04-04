@@ -1,11 +1,12 @@
 # ============================================================
-# Breeze Radio — Liquidsoap Configuration
+# Liquidsoap Configuration
 # ============================================================
 
 # --- Settings ---
 settings.harbor.bind_addrs.set(["0.0.0.0"])
 settings.log.level.set(3)
 
+station_name = environment.get("STATION_NAME", "Radio Station")
 harbor_password = environment.get("HARBOR_PASSWORD", "changeme")
 icecast_pass = environment.get("ICECAST_SOURCE_PASSWORD", "changeme")
 icecast_host = "icecast"
@@ -66,8 +67,8 @@ output.icecast(
   host=icecast_host, port=icecast_port,
   password=icecast_pass,
   mount="/stream-mp3-128",
-  name="Breeze Radio - MP3 128k",
-  description="Breeze Radio Nederland",
+  name="#{station_name} - MP3 128k",
+  description=station_name,
   radio
 )
 
@@ -76,8 +77,8 @@ output.icecast(
   host=icecast_host, port=icecast_port,
   password=icecast_pass,
   mount="/stream-mp3-320",
-  name="Breeze Radio - MP3 320k",
-  description="Breeze Radio Nederland",
+  name="#{station_name} - MP3 320k",
+  description=station_name,
   radio
 )
 
@@ -86,8 +87,8 @@ output.icecast(
   host=icecast_host, port=icecast_port,
   password=icecast_pass,
   mount="/stream-aac-128",
-  name="Breeze Radio - AAC 128k",
-  description="Breeze Radio Nederland",
+  name="#{station_name} - AAC 128k",
+  description=station_name,
   radio
 )
 
@@ -96,8 +97,8 @@ output.icecast(
   host=icecast_host, port=icecast_port,
   password=icecast_pass,
   mount="/stream-ogg-128",
-  name="Breeze Radio - Ogg 128k",
-  description="Breeze Radio Nederland",
+  name="#{station_name} - Ogg 128k",
+  description=station_name,
   radio
 )
 

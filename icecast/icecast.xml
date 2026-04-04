@@ -1,6 +1,6 @@
 <icecast>
-    <location>Netherlands</location>
-    <admin>admin@breezeradio.nl</admin>
+    <location>${STATION_LOCATION}</location>
+    <admin>${STATION_ADMIN_EMAIL}</admin>
 
     <limits>
         <clients>${ICECAST_MAX_LISTENERS}</clients>

@@ -3,6 +3,8 @@ services:
     build: ./icecast
     container_name: breezeradio-icecast
     environment:
+      - STATION_LOCATION=${STATION_LOCATION:-Netherlands}
+      - STATION_ADMIN_EMAIL=${STATION_ADMIN_EMAIL:-admin@example.com}
       - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD}
       - ICECAST_RELAY_PASSWORD=${ICECAST_RELAY_PASSWORD}
       - ICECAST_ADMIN_USER=${ICECAST_ADMIN_USER}
@@ -27,6 +29,7 @@ services:
       icecast:
         condition: service_healthy
     environment:
+      - STATION_NAME=${STATION_NAME:-Radio Station}
       - HARBOR_PASSWORD=${HARBOR_PASSWORD}
       - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD}
       - SILENCE_THRESHOLD_DB=${SILENCE_THRESHOLD_DB:--40}
@@ -79,6 +82,7 @@ services:
       icecast:
         condition: service_healthy
     environment:
+      - STATION_NAME=${STATION_NAME:-Radio Station}
       - ICECAST_URL=http://icecast:8000
       - ICECAST_ADMIN_USER=${ICECAST_ADMIN_USER}
       - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD}

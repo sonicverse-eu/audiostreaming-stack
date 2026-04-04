@@ -142,7 +142,13 @@ if [ "${SKIP_ENV}" != "true" ]; then
     info "Let's configure your streaming stack."
     echo ""
 
+    # Station identity
+    prompt STATION_NAME        "Station name" "Breeze Radio"
+    prompt STATION_LOCATION    "Station location" "Netherlands"
+    prompt STATION_ADMIN_EMAIL "Station admin email" "admin@breezeradio.nl"
+
     # Hostname
+    echo ""
     prompt ICECAST_HOSTNAME "Public hostname" "stream.breezeradio.nl"
 
     # Generate secure passwords
@@ -167,6 +173,11 @@ if [ "${SKIP_ENV}" != "true" ]; then
         LETSENCRYPT_STAGING=1
     fi
 
+    # Pushover alerts
+    echo ""
+    prompt PUSHOVER_USER_KEY  "Pushover user key (leave empty to skip alerts)" ""
+    prompt PUSHOVER_APP_TOKEN "Pushover app token" ""
+
     # PostHog
     echo ""
     prompt POSTHOG_API_KEY  "PostHog API key (leave empty to skip analytics)" ""
@@ -180,6 +191,11 @@ if [ "${SKIP_ENV}" != "true" ]; then
 
     # Write .env
     cat > .env <<ENVFILE
+# Station
+STATION_NAME=${STATION_NAME}
+STATION_LOCATION=${STATION_LOCATION}
+STATION_ADMIN_EMAIL=${STATION_ADMIN_EMAIL}
+
 # Icecast
 ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD}
 ICECAST_RELAY_PASSWORD=$(generate_password)
@@ -196,6 +212,12 @@ HARBOR_PASSWORD=${HARBOR_PASSWORD}
 # Let's Encrypt
 LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
 LETSENCRYPT_STAGING=${LETSENCRYPT_STAGING}
+
+# Pushover alerts
+PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
+PUSHOVER_APP_TOKEN=${PUSHOVER_APP_TOKEN}
+SILENCE_THRESHOLD_DB=-40
+SILENCE_DURATION=15
 
 # PostHog
 POSTHOG_API_KEY=${POSTHOG_API_KEY}

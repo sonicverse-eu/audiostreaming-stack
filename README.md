@@ -148,6 +148,9 @@ All secrets and settings are managed via `.env`:
 
 | Variable | Description |
 |---|---|
+| `STATION_NAME` | Radio station name (used in stream metadata and alerts) |
+| `STATION_LOCATION` | Station location (Icecast server info) |
+| `STATION_ADMIN_EMAIL` | Admin contact email (Icecast server info) |
 | `ICECAST_SOURCE_PASSWORD` | Password for Liquidsoap → Icecast connections |
 | `ICECAST_ADMIN_PASSWORD` | Icecast admin panel password |
 | `HARBOR_PASSWORD` | Password for studio → Liquidsoap connections |

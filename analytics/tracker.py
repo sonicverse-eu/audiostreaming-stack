@@ -25,6 +25,9 @@ POSTHOG_HOST = os.getenv("POSTHOG_HOST", "https://posthog.sonicverse.eu")
 POLL_INTERVAL = int(os.getenv("POSTHOG_POLL_INTERVAL", "30"))
 DISTINCT_ID = "breezeradio-streaming-stack"
 
+# Station
+STATION_NAME = os.getenv("STATION_NAME", "Radio Station")
+
 # Pushover
 PUSHOVER_USER_KEY = os.getenv("PUSHOVER_USER_KEY", "")
 PUSHOVER_APP_TOKEN = os.getenv("PUSHOVER_APP_TOKEN", "")
@@ -83,7 +86,7 @@ def handle_silence_alert(alert_type):
 
         last_alert_time = now
         send_pushover(
-            "Breeze Radio — Silence Detected",
+            f"{STATION_NAME} — Silence Detected",
             "Dead air detected on the stream. Check the studio connection and source encoders.",
             priority=1,
         )
@@ -96,7 +99,7 @@ def handle_silence_alert(alert_type):
 
     elif alert_type == "silence_end":
         send_pushover(
-            "Breeze Radio — Audio Resumed",
+            f"{STATION_NAME} — Audio Resumed",
             "Audio is back on the stream.",
             priority=-1,
         )
@@ -234,7 +237,7 @@ def track_source_status(sources):
 
         # Also alert on source disconnect via Pushover
         send_pushover(
-            "Breeze Radio — Source Disconnected",
+            f"{STATION_NAME} — Source Disconnected",
             f"Mount {mount} has gone offline. Failover may be active.",
             priority=0,
         )
