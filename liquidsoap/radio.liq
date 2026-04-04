@@ -48,6 +48,9 @@ radio = fallback(
   [primary, secondary, emergency, silence]
 )
 
+# Guarantee infallible source for outputs
+radio = mksafe(radio)
+
 # --- Output buffer ---
 # Smooth out jitter from encoding and network with a buffer
 radio = buffer(buffer=3.0, max=10.0, radio)
