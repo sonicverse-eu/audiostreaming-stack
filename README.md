@@ -236,12 +236,19 @@ Real-time broadcast engineer dashboard with Appwrite authentication. Only member
 
 ### Deployment on Appwrite Sites
 
-The dashboard frontend is a static site deployed separately on Appwrite Sites:
+The dashboard is a Next.js app (`status-dashboard/`) deployed separately on Appwrite Sites:
 
-1. In your Appwrite console, create a new Site
-2. Point it to the `status-panel/static/` directory
-3. Edit `status-panel/static/env.js` with your streaming server URL and Appwrite credentials
-4. Deploy via Appwrite CLI or Git integration
+1. `cd status-dashboard && cp .env.local.example .env.local`
+2. Edit `.env.local` with your streaming server URL and Appwrite credentials
+3. `npm install && npm run build` — outputs static export to `out/`
+4. Deploy `out/` to Appwrite Sites via CLI or Git integration
+
+```bash
+cd status-dashboard
+npm install
+npm run build
+# Deploy the out/ directory to Appwrite Sites
+```
 
 The API backend runs in the Docker stack and is proxied through nginx at `/api/`.
 
@@ -286,14 +293,15 @@ Alerts have a 5-minute cooldown to prevent spam. Configure thresholds via `SILEN
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── tracker.py
-├── status-panel/
+├── status-panel/              ← API backend (Docker)
 │   ├── Dockerfile
 │   ├── requirements.txt
-│   ├── server.py
-│   └── static/           ← deploy this to Appwrite Sites
-│       ├── index.html
-│       ├── env.js
-│       └── appwrite.json
+│   └── server.py
+├── status-dashboard/          ← Next.js frontend (Appwrite Sites)
+│   ├── app/
+│   ├── components/
+│   ├── lib/
+│   └── package.json
 ├── setup-firewall.sh
 └── emergency-audio/
     └── fallback.mp3

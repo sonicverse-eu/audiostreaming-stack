@@ -17,10 +17,10 @@ import glob as globmod
 import shutil
 
 import requests
-from flask import Flask, jsonify, send_from_directory, request, Response
+from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 
-app = Flask(__name__, static_folder="static")
+app = Flask(__name__)
 
 # CORS — allow the Appwrite Sites frontend
 CORS_ORIGIN = os.getenv("STATUS_PANEL_CORS_ORIGIN", "*")
@@ -155,11 +155,6 @@ def parse_stats(stats):
 # ============================================================
 # Routes — public (no auth)
 # ============================================================
-
-@app.route("/")
-def index():
-    return send_from_directory("static", "index.html")
-
 
 @app.route("/api/auth-config")
 def api_auth_config():
