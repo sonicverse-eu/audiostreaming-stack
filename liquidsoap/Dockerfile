@@ -1,5 +1,7 @@
 FROM savonet/liquidsoap:v2.4.2
 
+USER root
+
 COPY radio.liq /etc/liquidsoap/radio.liq
 
 # Ensure HLS output directory is writable
