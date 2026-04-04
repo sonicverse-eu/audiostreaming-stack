@@ -27,6 +27,16 @@ primary = input.harbor(
   buffer=10.0
 )
 
+primary.on_connect(synchronous=false, fun () -> begin
+  log("OK: Primary harbor connected")
+  ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=harbor_primary_up'"))
+end)
+
+primary.on_disconnect(synchronous=false, fun () -> begin
+  log("ALERT: Primary harbor disconnected")
+  ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=harbor_primary_down'"))
+end)
+
 # Fallback: lower bitrate Ogg stream
 secondary = input.harbor(
   "secondary",
@@ -35,6 +45,16 @@ secondary = input.harbor(
   max=30.0,
   buffer=10.0
 )
+
+secondary.on_connect(synchronous=false, fun () -> begin
+  log("OK: Secondary harbor connected")
+  ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=harbor_secondary_up'"))
+end)
+
+secondary.on_disconnect(synchronous=false, fun () -> begin
+  log("ALERT: Secondary harbor disconnected")
+  ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=harbor_secondary_down'"))
+end)
 
 # --- Emergency fallback ---
 # Playlist dir for emergency audio (plays any files in the directory)

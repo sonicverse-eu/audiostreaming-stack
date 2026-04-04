@@ -36,6 +36,15 @@ PUSHOVER_API_URL = "https://api.pushover.net/1/messages.json"
 ALERT_COOLDOWN = 300  # 5 minutes between repeated alerts
 last_alert_time = 0
 
+# Track the last outage signature so we only send one combined alert per change.
+last_outage_signature = None
+
+# Harbor state is tracked so secondary-down can escalate if primary is already down.
+harbor_states = {
+    "primary": True,
+    "secondary": True,
+}
+
 # Initialize PostHog (only if a real key is provided)
 posthog_client = None
 if POSTHOG_API_KEY and POSTHOG_API_KEY.startswith("phc_"):
@@ -114,6 +123,89 @@ def handle_silence_alert(alert_type):
             )
 
 
+def handle_stream_outage(disconnected_mounts):
+    """Send a single combined alert for all disconnected Icecast outputs."""
+    global last_outage_signature
+
+    if not disconnected_mounts:
+        return
+
+    outage_signature = tuple(sorted(disconnected_mounts))
+    if outage_signature == last_outage_signature:
+        return
+
+    last_outage_signature = outage_signature
+
+    send_pushover(
+        f"{STATION_NAME} — Stream Outage",
+        f"The following stream outputs went offline: {', '.join(disconnected_mounts)}.",
+        priority=1,
+    )
+
+    if POSTHOG_API_KEY:
+        posthog_client.capture(
+            distinct_id=DISTINCT_ID,
+            event="stream_outage_detected",
+            properties={"disconnected_mounts": disconnected_mounts},
+        )
+
+
+def handle_harbor_state(harbor_name, is_up):
+    """Track harbor connectivity and emit Pushover on disconnect transitions."""
+    global harbor_states
+
+    if harbor_name not in harbor_states:
+        harbor_states[harbor_name] = True
+
+    previous_state = harbor_states[harbor_name]
+    harbor_states[harbor_name] = is_up
+
+    if is_up:
+        if POSTHOG_API_KEY and previous_state is False:
+            posthog_client.capture(
+                distinct_id=DISTINCT_ID,
+                event="harbor_connected",
+                properties={"harbor": harbor_name},
+            )
+        print(f"[alerts] Harbor connected: {harbor_name}")
+        return
+
+    if previous_state is False:
+        return
+
+    if POSTHOG_API_KEY:
+        posthog_client.capture(
+            distinct_id=DISTINCT_ID,
+            event="harbor_disconnected",
+            properties={"harbor": harbor_name},
+        )
+
+    other_harbor = "secondary" if harbor_name == "primary" else "primary"
+    priority = 2 if harbor_states.get(other_harbor, True) is False else 1
+    message = (
+        f"The {harbor_name} studio input is offline. "
+        f"{('Both harbors are down, so the stream is in critical failover.' if priority == 2 else 'Failover should still be carrying the stream.') }"
+    )
+    send_pushover(
+        f"{STATION_NAME} — {harbor_name.title()} Harbor Down",
+        message,
+        priority=priority,
+    )
+
+
+def handle_alert(alert_type):
+    if alert_type in ("silence_start", "silence_end"):
+        handle_silence_alert(alert_type)
+    elif alert_type == "harbor_primary_up":
+        handle_harbor_state("primary", True)
+    elif alert_type == "harbor_primary_down":
+        handle_harbor_state("primary", False)
+    elif alert_type == "harbor_secondary_up":
+        handle_harbor_state("secondary", True)
+    elif alert_type == "harbor_secondary_down":
+        handle_harbor_state("secondary", False)
+
+
 # ============================================================
 # Webhook server (receives alerts from Liquidsoap)
 # ============================================================
@@ -125,7 +217,7 @@ class AlertHandler(BaseHTTPRequestHandler):
             params = parse_qs(parsed.query)
             alert_type = params.get("type", ["unknown"])[0]
             print(f"[alerts] Received alert: {alert_type}")
-            handle_silence_alert(alert_type)
+            handle_alert(alert_type)
             self.send_response(200)
             self.end_headers()
         elif parsed.path == "/health":
@@ -217,7 +309,7 @@ def track_listeners(sources):
 
 
 def track_source_status(sources):
-    """Detect and report source connect/disconnect (failover) events."""
+    """Detect source connect/disconnect and emit one combined outage alert."""
     global previous_sources
 
     current_mounts = {s.get("listenurl", "unknown") for s in sources}
@@ -234,7 +326,9 @@ def track_source_status(sources):
         print(f"[analytics] Source connected: {mount}")
 
     # Detect disconnected sources
-    for mount in prev_mounts - current_mounts:
+    disconnected_mounts = sorted(prev_mounts - current_mounts)
+
+    for mount in disconnected_mounts:
         if POSTHOG_API_KEY:
             posthog_client.capture(
                 distinct_id=DISTINCT_ID,
@@ -243,12 +337,8 @@ def track_source_status(sources):
             )
         print(f"[analytics] Source disconnected: {mount}")
 
-        # Also alert on source disconnect via Pushover
-        send_pushover(
-            f"{STATION_NAME} — Source Disconnected",
-            f"Mount {mount} has gone offline. Failover may be active.",
-            priority=0,
-        )
+    if disconnected_mounts:
+        handle_stream_outage(disconnected_mounts)
 
     # Update state
     previous_sources = {s.get("listenurl", "unknown"): s for s in sources}
