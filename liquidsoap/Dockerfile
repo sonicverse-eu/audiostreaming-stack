@@ -1,4 +1,4 @@
-FROM savonet/liquidsoap:v2.3.0
+FROM savonet/liquidsoap:v2.4.2
 
 COPY radio.liq /etc/liquidsoap/radio.liq
 
