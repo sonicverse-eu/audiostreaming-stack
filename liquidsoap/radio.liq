@@ -122,7 +122,7 @@ output.icecast(
 )
 
 output.icecast(
-  %vorbis(bitrate=128, channels=2, samplerate=44100),
+  %vorbis.cbr(bitrate=128, channels=2, samplerate=44100),
   host=icecast_host, port=icecast_port,
   password=icecast_pass,
   mount="/stream-ogg-128",
