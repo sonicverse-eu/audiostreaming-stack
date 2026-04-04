@@ -13,7 +13,6 @@ import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-import posthog
 import requests
 
 # Configuration
@@ -38,9 +37,10 @@ ALERT_COOLDOWN = 300  # 5 minutes between repeated alerts
 last_alert_time = 0
 
 # Initialize PostHog (only if a real key is provided)
+posthog_client = None
 if POSTHOG_API_KEY and POSTHOG_API_KEY.startswith("phc_"):
-    posthog.project_api_key = POSTHOG_API_KEY
-    posthog.host = POSTHOG_HOST
+    from posthog import Posthog
+    posthog_client = Posthog(project_api_key=POSTHOG_API_KEY, host=POSTHOG_HOST)
 else:
     POSTHOG_API_KEY = ""  # treat invalid keys as unconfigured
 
@@ -95,7 +95,7 @@ def handle_silence_alert(alert_type):
         )
 
         if POSTHOG_API_KEY:
-            posthog.capture(
+            posthog_client.capture(
                 distinct_id=DISTINCT_ID,
                 event="stream_silence_detected",
             )
@@ -108,7 +108,7 @@ def handle_silence_alert(alert_type):
         )
 
         if POSTHOG_API_KEY:
-            posthog.capture(
+            posthog_client.capture(
                 distinct_id=DISTINCT_ID,
                 event="stream_silence_resolved",
             )
@@ -192,7 +192,7 @@ def track_listeners(sources):
         listeners = source.get("listeners", 0)
         total_listeners += listeners
 
-        posthog.capture(
+        posthog_client.capture(
             distinct_id=DISTINCT_ID,
             event="stream_listeners",
             properties={
@@ -206,7 +206,7 @@ def track_listeners(sources):
             },
         )
 
-    posthog.capture(
+    posthog_client.capture(
         distinct_id=DISTINCT_ID,
         event="stream_total_listeners",
         properties={
@@ -226,7 +226,7 @@ def track_source_status(sources):
     # Detect new sources
     for mount in current_mounts - prev_mounts:
         if POSTHOG_API_KEY:
-            posthog.capture(
+            posthog_client.capture(
                 distinct_id=DISTINCT_ID,
                 event="stream_source_connected",
                 properties={"mount": mount},
@@ -236,7 +236,7 @@ def track_source_status(sources):
     # Detect disconnected sources
     for mount in prev_mounts - current_mounts:
         if POSTHOG_API_KEY:
-            posthog.capture(
+            posthog_client.capture(
                 distinct_id=DISTINCT_ID,
                 event="stream_source_disconnected",
                 properties={"mount": mount},
@@ -264,7 +264,7 @@ def polling_loop():
             track_listeners(sources)
             track_source_status(sources)
             if POSTHOG_API_KEY:
-                posthog.flush()
+                posthog_client.flush()
 
         time.sleep(POLL_INTERVAL)
 
