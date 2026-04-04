@@ -41,6 +41,24 @@ radio = fallback(
   [primary, secondary, emergency]
 )
 
+# --- Silence detection + Pushover alerts ---
+silence_threshold = float_of_string(environment.get("SILENCE_THRESHOLD_DB", "-40"))
+silence_duration = float_of_string(environment.get("SILENCE_DURATION", "15"))
+
+radio = blank.detect(
+  radio,
+  max_blank=silence_duration,
+  threshold=silence_threshold,
+  on_blank=fun () -> begin
+    log("ALERT: Silence detected for #{silence_duration}s (threshold: #{silence_threshold}dB)")
+    ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=silence_start'"))
+  end,
+  on_noise=fun () -> begin
+    log("OK: Audio resumed after silence")
+    ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=silence_end'"))
+  end
+)
+
 # --- Icecast outputs (multiple bitrates/formats) ---
 
 output.icecast(

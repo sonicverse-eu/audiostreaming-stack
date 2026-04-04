@@ -155,18 +155,34 @@ All secrets and settings are managed via `.env`:
 | `ICECAST_MAX_LISTENERS` | Maximum concurrent listeners |
 | `LETSENCRYPT_EMAIL` | Email for Let's Encrypt notifications |
 | `LETSENCRYPT_STAGING` | Set to `1` for test certificates |
+| `PUSHOVER_USER_KEY` | Pushover user key for silence/failover alerts |
+| `PUSHOVER_APP_TOKEN` | Pushover application token |
+| `SILENCE_THRESHOLD_DB` | Silence detection threshold in dB (default: -40) |
+| `SILENCE_DURATION` | Seconds of silence before alerting (default: 15) |
 | `POSTHOG_API_KEY` | PostHog project API key |
 | `POSTHOG_HOST` | PostHog instance URL |
 | `POSTHOG_POLL_INTERVAL` | Stats polling interval in seconds (default: 30) |
 
-## Analytics
+## Analytics & Alerts
 
 The analytics sidecar sends the following events to PostHog:
 
 - `stream_listeners` — per-mount listener count (every poll)
 - `stream_total_listeners` — aggregate listener count
-- `stream_source_connected` — mount comes online
-- `stream_source_disconnected` — mount goes offline
+- `stream_source_connected` / `stream_source_disconnected` — mount online/offline
+- `stream_silence_detected` / `stream_silence_resolved` — dead air events
+
+### Pushover Alerts
+
+Liquidsoap monitors the audio stream for silence and triggers Pushover notifications:
+
+| Alert | Priority | Trigger |
+|---|---|---|
+| Silence detected | High (siren) | Audio below -40 dB for 15 seconds |
+| Audio resumed | Low | Audio returns after silence |
+| Source disconnected | Normal | An Icecast mount goes offline |
+
+Alerts have a 5-minute cooldown to prevent spam. Configure thresholds via `SILENCE_THRESHOLD_DB` and `SILENCE_DURATION` in `.env`.
 
 ## File Structure
 

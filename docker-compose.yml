@@ -29,6 +29,8 @@ services:
     environment:
       - HARBOR_PASSWORD=${HARBOR_PASSWORD}
       - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD}
+      - SILENCE_THRESHOLD_DB=${SILENCE_THRESHOLD_DB:--40}
+      - SILENCE_DURATION=${SILENCE_DURATION:-15}
     ports:
       - "${HARBOR_PRIMARY_PORT:-8010}:8010"    # Studio primary (FLAC)
       - "${HARBOR_FALLBACK_PORT:-8011}:8011"   # Studio fallback (Ogg)
@@ -83,6 +85,8 @@ services:
       - POSTHOG_API_KEY=${POSTHOG_API_KEY}
       - POSTHOG_HOST=${POSTHOG_HOST}
       - POSTHOG_POLL_INTERVAL=${POSTHOG_POLL_INTERVAL:-30}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
+      - PUSHOVER_APP_TOKEN=${PUSHOVER_APP_TOKEN}
     networks:
       - streaming
     restart: unless-stopped
