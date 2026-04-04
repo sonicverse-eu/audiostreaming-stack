@@ -50,13 +50,7 @@ Fallback chain: Primary → Fallback → Emergency file (automatic, no manual in
 
 | Mount | Format | Bitrate | URL |
 |---|---|---|---|
-| `/stream-mp3-128` | MP3 | 128 kbps | `https://<host>/listen/stream-mp3-128` |
-| `/stream-mp3-192` | MP3 | 192 kbps | `https://<host>/listen/stream-mp3-192` |
-| `/stream-mp3-320` | MP3 | 320 kbps | `https://<host>/listen/stream-mp3-320` |
-| `/stream-aac-128` | AAC | 128 kbps | `https://<host>/listen/stream-aac-128` |
-| `/stream-aac-192` | AAC | 192 kbps | `https://<host>/listen/stream-aac-192` |
-| `/stream-ogg-128` | Ogg Vorbis | 128 kbps | `https://<host>/listen/stream-ogg-128` |
-| `/stream-flac` | FLAC | Lossless | `https://<host>/listen/stream-flac` |
+ 
 
 ### HLS (for mobile)
 

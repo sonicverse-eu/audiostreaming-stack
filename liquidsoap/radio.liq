@@ -27,12 +27,12 @@ primary = input.harbor(
   buffer=10.0
 )
 
-primary.on_connect(synchronous=false, fun () -> begin
+primary.on_connect(synchronous=false, fun (_) -> begin
   log("OK: Primary harbor connected")
   ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=harbor_primary_up'"))
 end)
 
-primary.on_disconnect(synchronous=false, fun () -> begin
+primary.on_disconnect(synchronous=false, fun (_) -> begin
   log("ALERT: Primary harbor disconnected")
   ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=harbor_primary_down'"))
 end)
@@ -46,12 +46,12 @@ secondary = input.harbor(
   buffer=10.0
 )
 
-secondary.on_connect(synchronous=false, fun () -> begin
+secondary.on_connect(synchronous=false, fun (_) -> begin
   log("OK: Secondary harbor connected")
   ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=harbor_secondary_up'"))
 end)
 
-secondary.on_disconnect(synchronous=false, fun () -> begin
+secondary.on_disconnect(synchronous=false, fun (_) -> begin
   log("ALERT: Secondary harbor disconnected")
   ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=harbor_secondary_down'"))
 end)
