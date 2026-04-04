@@ -75,6 +75,37 @@ services:
       - streaming
     restart: unless-stopped
 
+  status-panel:
+    build: ./status-panel
+    container_name: breezeradio-status-panel
+    depends_on:
+      icecast:
+        condition: service_healthy
+    environment:
+      - STATION_NAME=${STATION_NAME:-Radio Station}
+      - ICECAST_URL=http://icecast:8000
+      - ICECAST_ADMIN_USER=${ICECAST_ADMIN_USER}
+      - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD}
+      - ICECAST_HOSTNAME=${ICECAST_HOSTNAME}
+      - ICECAST_MAX_LISTENERS=${ICECAST_MAX_LISTENERS}
+      - HARBOR_PRIMARY_PORT=${HARBOR_PRIMARY_PORT:-8010}
+      - HARBOR_FALLBACK_PORT=${HARBOR_FALLBACK_PORT:-8011}
+      - SILENCE_THRESHOLD_DB=${SILENCE_THRESHOLD_DB:--40}
+      - SILENCE_DURATION=${SILENCE_DURATION:-15}
+      - APPWRITE_ENDPOINT=${APPWRITE_ENDPOINT}
+      - APPWRITE_PROJECT_ID=${APPWRITE_PROJECT_ID}
+      - APPWRITE_TEAM_ID=${APPWRITE_TEAM_ID}
+      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
+      - STATUS_PANEL_CORS_ORIGIN=${STATUS_PANEL_CORS_ORIGIN:-*}
+      - EMERGENCY_AUDIO_DIR=/emergency-audio
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./emergency-audio:/emergency-audio
+    networks:
+      - streaming
+    restart: unless-stopped
+
   analytics:
     build: ./analytics
     container_name: breezeradio-analytics

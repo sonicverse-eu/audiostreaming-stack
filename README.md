@@ -213,9 +213,37 @@ All secrets and settings are managed via `.env`:
 | `PUSHOVER_APP_TOKEN` | Pushover application token |
 | `SILENCE_THRESHOLD_DB` | Silence detection threshold in dB (default: -40) |
 | `SILENCE_DURATION` | Seconds of silence before alerting (default: 15) |
+| `APPWRITE_ENDPOINT` | Appwrite API endpoint |
+| `APPWRITE_PROJECT_ID` | Appwrite project ID |
+| `APPWRITE_TEAM_ID` | Appwrite team ID (only members get panel access) |
+| `STATUS_PANEL_CORS_ORIGIN` | Frontend URL for CORS (e.g. `https://status.breezeradio.nl`) |
 | `POSTHOG_API_KEY` | PostHog project API key |
 | `POSTHOG_HOST` | PostHog instance URL |
 | `POSTHOG_POLL_INTERVAL` | Stats polling interval in seconds (default: 30) |
+
+## Status Panel
+
+Real-time broadcast engineer dashboard with Appwrite authentication. Only members of the configured Appwrite team can access the panel.
+
+**Features:**
+- Live listener counts and mount point status (5s refresh)
+- Container health monitoring
+- Stack configuration overview
+- Recent alerts timeline
+- Emergency audio upload/management
+- Useful CLI commands (click to copy)
+- Databases & storage overview
+
+### Deployment on Appwrite Sites
+
+The dashboard frontend is a static site deployed separately on Appwrite Sites:
+
+1. In your Appwrite console, create a new Site
+2. Point it to the `status-panel/static/` directory
+3. Edit `status-panel/static/env.js` with your streaming server URL and Appwrite credentials
+4. Deploy via Appwrite CLI or Git integration
+
+The API backend runs in the Docker stack and is proxied through nginx at `/api/`.
 
 ## Analytics & Alerts
 
@@ -258,6 +286,15 @@ Alerts have a 5-minute cooldown to prevent spam. Configure thresholds via `SILEN
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── tracker.py
+├── status-panel/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── server.py
+│   └── static/           ← deploy this to Appwrite Sites
+│       ├── index.html
+│       ├── env.js
+│       └── appwrite.json
+├── setup-firewall.sh
 └── emergency-audio/
     └── fallback.mp3
 ```

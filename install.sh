@@ -178,6 +178,13 @@ if [ "${SKIP_ENV}" != "true" ]; then
     prompt PUSHOVER_USER_KEY  "Pushover user key (leave empty to skip alerts)" ""
     prompt PUSHOVER_APP_TOKEN "Pushover app token" ""
 
+    # Appwrite (status panel auth)
+    echo ""
+    prompt APPWRITE_ENDPOINT   "Appwrite endpoint" "https://cloud.appwrite.io/v1"
+    prompt APPWRITE_PROJECT_ID "Appwrite project ID" ""
+    prompt APPWRITE_TEAM_ID    "Appwrite team ID (members get panel access)" ""
+    prompt STATUS_PANEL_CORS_ORIGIN "Status panel frontend URL (for CORS)" "https://status.breezeradio.nl"
+
     # PostHog
     echo ""
     prompt POSTHOG_API_KEY  "PostHog API key (leave empty to skip analytics)" ""
@@ -218,6 +225,12 @@ PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
 PUSHOVER_APP_TOKEN=${PUSHOVER_APP_TOKEN}
 SILENCE_THRESHOLD_DB=-40
 SILENCE_DURATION=15
+
+# Appwrite (status panel auth)
+APPWRITE_ENDPOINT=${APPWRITE_ENDPOINT}
+APPWRITE_PROJECT_ID=${APPWRITE_PROJECT_ID}
+APPWRITE_TEAM_ID=${APPWRITE_TEAM_ID}
+STATUS_PANEL_CORS_ORIGIN=${STATUS_PANEL_CORS_ORIGIN}
 
 # PostHog
 POSTHOG_API_KEY=${POSTHOG_API_KEY}

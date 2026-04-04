@@ -1,0 +1,11 @@
+{
+    "projectId": "",
+    "sites": [
+        {
+            "siteId": "breezeradio-status",
+            "buildCommand": "",
+            "outputDirectory": ".",
+            "installCommand": ""
+        }
+    ]
+}
