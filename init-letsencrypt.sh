@@ -65,7 +65,9 @@ echo "Waiting for nginx..."
 sleep 3
 
 echo "Requesting Let's Encrypt certificate..."
-docker compose run --rm certbot certonly \
+# Override entrypoint since docker-compose.yml sets a renewal-loop entrypoint
+docker compose run --rm --entrypoint "" certbot \
+    certbot certonly \
     --webroot \
     --webroot-path=/var/www/certbot \
     $EMAIL_ARG \
