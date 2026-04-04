@@ -4,7 +4,7 @@
 
     <limits>
         <clients>${ICECAST_MAX_LISTENERS}</clients>
-        <sources>8</sources>
+        <sources>12</sources>
         <queue-size>524288</queue-size>
         <client-timeout>30</client-timeout>
         <header-timeout>15</header-timeout>
@@ -38,6 +38,12 @@
     </mount>
 
     <mount type="normal">
+        <mount-name>/stream-mp3-192</mount-name>
+        <charset>UTF-8</charset>
+        <public>1</public>
+    </mount>
+
+    <mount type="normal">
         <mount-name>/stream-mp3-320</mount-name>
         <charset>UTF-8</charset>
         <public>1</public>
@@ -45,6 +51,12 @@
 
     <mount type="normal">
         <mount-name>/stream-aac-128</mount-name>
+        <charset>UTF-8</charset>
+        <public>1</public>
+    </mount>
+
+    <mount type="normal">
+        <mount-name>/stream-aac-192</mount-name>
         <charset>UTF-8</charset>
         <public>1</public>
     </mount>

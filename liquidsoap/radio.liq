@@ -73,6 +73,16 @@ output.icecast(
 )
 
 output.icecast(
+  %mp3(bitrate=192, samplerate=44100, stereo=true),
+  host=icecast_host, port=icecast_port,
+  password=icecast_pass,
+  mount="/stream-mp3-192",
+  name="#{station_name} - MP3 192k",
+  description=station_name,
+  radio
+)
+
+output.icecast(
   %mp3(bitrate=320, samplerate=44100, stereo=true),
   host=icecast_host, port=icecast_port,
   password=icecast_pass,
@@ -88,6 +98,16 @@ output.icecast(
   password=icecast_pass,
   mount="/stream-aac-128",
   name="#{station_name} - AAC 128k",
+  description=station_name,
+  radio
+)
+
+output.icecast(
+  %fdkaac(bitrate=192, channels=2, samplerate=44100),
+  host=icecast_host, port=icecast_port,
+  password=icecast_pass,
+  mount="/stream-aac-192",
+  name="#{station_name} - AAC 192k",
   description=station_name,
   radio
 )
@@ -112,22 +132,36 @@ output.icecast(
   radio
 )
 
-# --- HLS output (for mobile streaming) ---
+# --- HLS output (adaptive bitrate streaming) ---
 output.file.hls(
   "/hls",
-  segment_duration=6.0,
-  segments=5,
-  segments_overhead=10,
+  segment_duration=4.0,
+  segments=6,
+  segments_overhead=12,
   playlist="live.m3u8",
   [
+    # Low — mobile on poor connections
+    ("aac_48",
+      %ffmpeg(format="mpegts",
+        %audio(codec="aac", b="48k", channels=2, ar=44100, profile="aac_he")
+      )
+    ),
+    # Medium — mobile on decent connections
+    ("aac_96",
+      %ffmpeg(format="mpegts",
+        %audio(codec="aac", b="96k", channels=2, ar=44100)
+      )
+    ),
+    # Standard — wifi / good mobile
     ("aac_128",
       %ffmpeg(format="mpegts",
         %audio(codec="aac", b="128k", channels=2, ar=44100)
       )
     ),
-    ("mp3_128",
+    # High quality — wifi / broadband
+    ("aac_256",
       %ffmpeg(format="mpegts",
-        %audio(codec="libmp3lame", b="128k", channels=2, ar=44100)
+        %audio(codec="aac", b="256k", channels=2, ar=44100)
       )
     )
   ],

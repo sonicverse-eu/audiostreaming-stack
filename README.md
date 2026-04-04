@@ -51,8 +51,10 @@ Fallback chain: Primary → Fallback → Emergency file (automatic, no manual in
 | Mount | Format | Bitrate | URL |
 |---|---|---|---|
 | `/stream-mp3-128` | MP3 | 128 kbps | `https://<host>/listen/stream-mp3-128` |
+| `/stream-mp3-192` | MP3 | 192 kbps | `https://<host>/listen/stream-mp3-192` |
 | `/stream-mp3-320` | MP3 | 320 kbps | `https://<host>/listen/stream-mp3-320` |
 | `/stream-aac-128` | AAC | 128 kbps | `https://<host>/listen/stream-aac-128` |
+| `/stream-aac-192` | AAC | 192 kbps | `https://<host>/listen/stream-aac-192` |
 | `/stream-ogg-128` | Ogg Vorbis | 128 kbps | `https://<host>/listen/stream-ogg-128` |
 | `/stream-flac` | FLAC | Lossless | `https://<host>/listen/stream-flac` |
 
@@ -62,7 +64,7 @@ Fallback chain: Primary → Fallback → Emergency file (automatic, no manual in
 https://<host>/hls/live.m3u8
 ```
 
-Adaptive with AAC 128k and MP3 128k variants.
+Adaptive bitrate with 4 AAC quality tiers (48k, 96k, 128k, 256k) — players automatically select the best quality for the connection.
 
 ## Prerequisites
 
@@ -92,6 +94,54 @@ brew install --cask docker
 **Windows:**
 
 Download and install [Docker Desktop](https://www.docker.com/products/docker-desktop/) — requires WSL 2.
+
+### Firewall
+
+Open the following ports on your server:
+
+| Port | Protocol | Purpose |
+|---|---|---|
+| 80 | TCP | HTTP (Let's Encrypt ACME + redirect to HTTPS) |
+| 443 | TCP | HTTPS (listener streams + HLS + admin) |
+| 8010 | TCP | Studio primary input (FLAC) |
+| 8011 | TCP | Studio fallback input (Ogg) |
+
+**Ubuntu/Debian (ufw):**
+```bash
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 8010/tcp
+sudo ufw allow 8011/tcp
+sudo ufw reload
+```
+
+**CentOS/RHEL (firewalld):**
+```bash
+sudo firewall-cmd --permanent --add-port=80/tcp
+sudo firewall-cmd --permanent --add-port=443/tcp
+sudo firewall-cmd --permanent --add-port=8010/tcp
+sudo firewall-cmd --permanent --add-port=8011/tcp
+sudo firewall-cmd --reload
+```
+
+**iptables:**
+```bash
+sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 8010 -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 8011 -j ACCEPT
+```
+
+**Automated setup (UFW):**
+```bash
+# Open all required ports (unrestricted)
+sudo ./setup-firewall.sh
+
+# Recommended: restrict studio ports to your studio's IP
+sudo ./setup-firewall.sh --studio-ip 203.0.113.50
+```
+
+The script ensures SSH access is preserved, opens the required ports, and optionally restricts studio source ports to a specific IP.
 
 ## Quick Start
 
