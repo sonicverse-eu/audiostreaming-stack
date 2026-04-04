@@ -55,6 +55,12 @@
         <public>1</public>
     </mount>
 
+    <mount type="normal">
+        <mount-name>/stream-flac</mount-name>
+        <charset>UTF-8</charset>
+        <public>1</public>
+    </mount>
+
     <fileserve>1</fileserve>
 
     <paths>

@@ -102,6 +102,16 @@ output.icecast(
   radio
 )
 
+output.icecast(
+  %ogg(%flac(channels=2, bits_per_sample=16, samplerate=44100)),
+  host=icecast_host, port=icecast_port,
+  password=icecast_pass,
+  mount="/stream-flac",
+  name="#{station_name} - FLAC HiFi",
+  description=station_name,
+  radio
+)
+
 # --- HLS output (for mobile streaming) ---
 output.file.hls(
   "/hls",
