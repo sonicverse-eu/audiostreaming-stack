@@ -61,6 +61,67 @@ TOTAL_STEPS=6
 print_banner
 
 # ----------------------------------------------------------
+# Detect existing installation
+# ----------------------------------------------------------
+EXISTING_STACK=false
+if docker compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
+    EXISTING_STACK=true
+    echo ""
+    warn "Existing streaming stack detected!"
+    echo ""
+    echo "  Choose an action:"
+    echo "    1) Update — rebuild and restart containers (keeps .env and data)"
+    echo "    2) Clean reinstall — stop, remove containers/images, reconfigure"
+    echo "    3) Cancel"
+    echo ""
+    read -rp "  → Choice [1/2/3]: " update_choice
+
+    case "$update_choice" in
+        1)
+            info "Updating stack..."
+            echo ""
+            info "Pulling latest changes..."
+            git pull 2>/dev/null || true
+            echo ""
+            info "Rebuilding containers..."
+            docker compose build
+            echo ""
+            info "Restarting with new images..."
+            docker compose up -d
+            echo ""
+            success "Stack updated successfully!"
+            echo ""
+            docker compose ps
+            echo ""
+            exit 0
+            ;;
+        2)
+            info "Stopping and removing existing stack..."
+            docker compose down --rmi local --remove-orphans
+            docker volume rm audiostreaming-stack_hls-data audiostreaming-stack_icecast-logs 2>/dev/null || true
+            success "Old stack removed"
+            echo ""
+            info "Continuing with fresh install..."
+            ;;
+        3)
+            info "Cancelled."
+            exit 0
+            ;;
+        *)
+            error "Invalid choice."
+            exit 1
+            ;;
+    esac
+elif docker compose ps -a --quiet 2>/dev/null | head -1 | grep -q .; then
+    warn "Stopped containers from a previous install detected."
+    read -rp "  → Remove them before continuing? (Y/n): " remove_old
+    if [[ ! "$remove_old" =~ ^[Nn]$ ]]; then
+        docker compose down --rmi local --remove-orphans
+        success "Old containers removed"
+    fi
+fi
+
+# ----------------------------------------------------------
 # Step 1: Check prerequisites
 # ----------------------------------------------------------
 step 1 "Checking prerequisites"
