@@ -4,7 +4,9 @@ on:
   issues:
     types: [labeled, unlabeled]
   pull_request:
-    types: [labeled, unlabeled]
+    types: [labeled, unlabeled, closed, reopened, review_requested, review_request_removed, ready_for_review, converted_to_draft]
+  pull_request_review:
+    types: [submitted, dismissed]
 
 jobs:
   sync:
@@ -20,6 +22,11 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
+            const STATUS_PREFIX = 'Status: ';
+            const STATUS_IN_PROGRESS = 'Status: In Progress';
+            const STATUS_REVIEW_REQUESTED = 'Status: Review Requested';
+            const STATUS_APPROVED = 'Status: Approved';
+            const STATUS_MERGED = 'Status: Merged';
 
             // Avoid infinite loops caused by automation-triggered label events.
             // Copilot Cloud Agent connects as a GitHub App whose login ends in "[bot]"
@@ -28,6 +35,263 @@ jobs:
             function isAutomationActor(login) {
               if (!login) return false;
               return login.endsWith('[bot]') || /^copilot[-_\s]/i.test(login);
+            }
+
+            async function ensureLabelExists(labelName) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name: labelName });
+              } catch {
+                await github.rest.issues.createLabel({
+                  owner,
+                  repo,
+                  name: labelName,
+                  color: 'fbca04',
+                });
+                core.info(`Created label: ${labelName}`);
+              }
+            }
+
+            async function getConnectedPRNumbers(issueNumber) {
+              const query = `
+                query($owner: String!, $repo: String!, $number: Int!, $after: String) {
+                  repository(owner: $owner, name: $repo) {
+                    issue(number: $number) {
+                      timelineItems(first: 100, after: $after, itemTypes: [CROSS_REFERENCED_EVENT]) {
+                        nodes {
+                          ... on CrossReferencedEvent {
+                            source {
+                              __typename
+                              ... on PullRequest { number }
+                            }
+                          }
+                        }
+                        pageInfo { hasNextPage endCursor }
+                      }
+                    }
+                  }
+                }
+              `;
+
+              const connected = new Set();
+              let after = null;
+
+              while (true) {
+                const result = await github.graphql(query, { owner, repo, number: issueNumber, after });
+                const connection = result.repository.issue.timelineItems;
+
+                for (const node of connection.nodes) {
+                  if (node.source && node.source.__typename === 'PullRequest') {
+                    connected.add(node.source.number);
+                  }
+                }
+
+                if (!connection.pageInfo.hasNextPage) break;
+                after = connection.pageInfo.endCursor;
+              }
+
+              return Array.from(connected);
+            }
+
+            async function getLinkedIssueNumbersForPR(prNumber) {
+              const linked = new Set();
+
+              const closingIssuesQuery = `
+                query($owner: String!, $repo: String!, $number: Int!, $after: String) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      closingIssuesReferences(first: 100, after: $after) {
+                        nodes {
+                          number
+                          repository {
+                            owner { login }
+                            name
+                          }
+                        }
+                        pageInfo { hasNextPage endCursor }
+                      }
+                    }
+                  }
+                }
+              `;
+
+              let closingAfter = null;
+              while (true) {
+                const result = await github.graphql(closingIssuesQuery, {
+                  owner,
+                  repo,
+                  number: prNumber,
+                  after: closingAfter,
+                });
+
+                const connection = result.repository.pullRequest.closingIssuesReferences;
+                for (const issue of connection.nodes) {
+                  if (!issue?.repository) continue;
+                  if (issue.repository.owner.login === owner && issue.repository.name === repo) {
+                    linked.add(issue.number);
+                  }
+                }
+
+                if (!connection.pageInfo.hasNextPage) break;
+                closingAfter = connection.pageInfo.endCursor;
+              }
+
+              const crossRefsQuery = `
+                query($owner: String!, $repo: String!, $number: Int!, $after: String) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      timelineItems(first: 100, after: $after, itemTypes: [CROSS_REFERENCED_EVENT]) {
+                        nodes {
+                          ... on CrossReferencedEvent {
+                            source {
+                              __typename
+                              ... on Issue {
+                                number
+                                repository {
+                                  owner { login }
+                                  name
+                                }
+                              }
+                            }
+                          }
+                        }
+                        pageInfo { hasNextPage endCursor }
+                      }
+                    }
+                  }
+                }
+              `;
+
+              let crossRefAfter = null;
+              while (true) {
+                const result = await github.graphql(crossRefsQuery, {
+                  owner,
+                  repo,
+                  number: prNumber,
+                  after: crossRefAfter,
+                });
+
+                const connection = result.repository.pullRequest.timelineItems;
+                for (const node of connection.nodes) {
+                  const src = node?.source;
+                  if (!src || src.__typename !== 'Issue' || !src.repository) continue;
+                  if (src.repository.owner.login === owner && src.repository.name === repo) {
+                    linked.add(src.number);
+                  }
+                }
+
+                if (!connection.pageInfo.hasNextPage) break;
+                crossRefAfter = connection.pageInfo.endCursor;
+              }
+
+              return Array.from(linked);
+            }
+
+            async function syncExactStatusLabels(itemNumber, effectiveStatusLabels) {
+              const { data: itemData } = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: itemNumber,
+              });
+
+              const itemStatusLabels = itemData.labels
+                .map(l => l.name)
+                .filter(n => n.startsWith(STATUS_PREFIX));
+
+              for (const stale of itemStatusLabels) {
+                if (!effectiveStatusLabels.includes(stale)) {
+                  core.info(`Removing "${stale}" from #${itemNumber}`);
+                  await github.rest.issues.removeLabel({
+                    owner,
+                    repo,
+                    issue_number: itemNumber,
+                    name: stale,
+                  });
+                }
+              }
+
+              const labelsToAdd = effectiveStatusLabels.filter(l => !itemStatusLabels.includes(l));
+              if (labelsToAdd.length > 0) {
+                for (const label of labelsToAdd) {
+                  await ensureLabelExists(label);
+                }
+                core.info(`Adding [${labelsToAdd.join(', ')}] to #${itemNumber}`);
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number: itemNumber,
+                  labels: labelsToAdd,
+                });
+              }
+            }
+
+            function deriveStatusFromPREvent(pr) {
+              if (context.eventName === 'pull_request_review') {
+                const reviewState = (context.payload.review?.state || '').toLowerCase();
+                if (reviewState === 'approved') return STATUS_APPROVED;
+                return STATUS_IN_PROGRESS;
+              }
+
+              const action = context.payload.action;
+              if (action === 'closed' && pr.merged) return STATUS_MERGED;
+              if (action === 'review_requested') return STATUS_REVIEW_REQUESTED;
+              if (action === 'review_request_removed') {
+                const hasPendingReviewers =
+                  (pr.requested_reviewers?.length || 0) > 0 ||
+                  (pr.requested_teams?.length || 0) > 0;
+                return hasPendingReviewers ? STATUS_REVIEW_REQUESTED : STATUS_IN_PROGRESS;
+              }
+              if (action === 'reopened' || action === 'ready_for_review' || action === 'converted_to_draft') {
+                return STATUS_IN_PROGRESS;
+              }
+              return null;
+            }
+
+            const isPRLabelEvent =
+              context.eventName === 'pull_request' &&
+              (context.payload.action === 'labeled' || context.payload.action === 'unlabeled');
+
+            const isIssueLabelEvent =
+              context.eventName === 'issues' &&
+              (context.payload.action === 'labeled' || context.payload.action === 'unlabeled');
+
+            const isPRStatusTransitionEvent =
+              context.eventName === 'pull_request_review' ||
+              (context.eventName === 'pull_request' && !isPRLabelEvent);
+
+            if (isPRStatusTransitionEvent) {
+              const pr = context.payload.pull_request;
+              if (!pr) {
+                core.info('No PR payload found – skipping.');
+                return;
+              }
+
+              const desiredStatus = deriveStatusFromPREvent(pr);
+              if (!desiredStatus) {
+                core.info(`Action "${context.payload.action}" has no status mapping – skipping.`);
+                return;
+              }
+
+              core.info(`PR #${pr.number} transitioned to status: ${desiredStatus}`);
+
+              const effectiveStatusLabels = [desiredStatus];
+              await syncExactStatusLabels(pr.number, effectiveStatusLabels);
+
+              const linkedIssueNumbers = await getLinkedIssueNumbersForPR(pr.number);
+              core.info(
+                `Linked issues for #${pr.number}: ` +
+                (linkedIssueNumbers.length > 0 ? linkedIssueNumbers.map(n => `#${n}`).join(', ') : 'none')
+              );
+
+              for (const issueNumber of linkedIssueNumbers) {
+                await syncExactStatusLabels(issueNumber, effectiveStatusLabels);
+              }
+
+              return;
+            }
+
+            if (!isPRLabelEvent && !isIssueLabelEvent) {
+              core.info(`Event ${context.eventName}/${context.payload.action} is not handled here – skipping.`);
+              return;
             }
 
             if (isAutomationActor(context.actor)) {
@@ -42,13 +306,13 @@ jobs:
               core.info('No label found in payload – skipping.');
               return;
             }
-            if (!labelName.startsWith('Status: ')) {
+            if (!labelName.startsWith(STATUS_PREFIX)) {
               core.info(`Label "${labelName}" is not a Status label – skipping.`);
               return;
             }
 
-            const isPR = !!context.payload.pull_request;
-            const number = isPR
+            const isPR = context.eventName === 'pull_request';
+            const number = context.payload.pull_request
               ? context.payload.pull_request.number
               : context.payload.issue.number;
 
@@ -63,7 +327,7 @@ jobs:
               : context.payload.issue.labels;
             const rawStatusLabels = rawLabels
               .map(l => l.name)
-              .filter(n => n.startsWith('Status: '));
+              .filter(n => n.startsWith(STATUS_PREFIX));
 
             core.info(
               `Current status labels on #${number}: ` +
@@ -93,55 +357,10 @@ jobs:
               effectiveStatusLabels = rawStatusLabels;
             }
 
-            // Sync is one-way: issues → PRs only. After enforcing the single-label
-            // rule on the PR itself, there is nothing more to propagate.
-            if (isPR) {
-              core.info('Triggered by a PR – sync is one-way (issue → PR only), done.');
-              return;
-            }
+            const connectedItems = isPR
+              ? (await getLinkedIssueNumbersForPR(number)).map(n => ({ number: n, type: 'issue' }))
+              : (await getConnectedPRNumbers(number)).map(n => ({ number: n, type: 'pr' }));
 
-            // ── Find connected PRs (issue → PR direction only) ────────────────────
-
-            async function getConnectedItems() {
-              const connected = [];
-              // PRs that cross-reference this issue.
-              // 100 is the maximum page size; issues with more than 100 cross-references
-              // may not have all linked PRs synced in a single run.
-              const query = `
-                query($owner: String!, $repo: String!, $number: Int!) {
-                  repository(owner: $owner, name: $repo) {
-                    issue(number: $number) {
-                      timelineItems(first: 100, itemTypes: [CROSS_REFERENCED_EVENT]) {
-                        nodes {
-                          ... on CrossReferencedEvent {
-                            source {
-                              __typename
-                              ... on PullRequest { number }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              `;
-              const result = await github.graphql(query, { owner, repo, number });
-              const nodes = result.repository.issue.timelineItems.nodes;
-              if (nodes.length === 100) {
-                core.warning(
-                  `#${number} has exactly 100 cross-reference events returned; ` +
-                  'some linked PRs may not have been synced due to API page-size limit.'
-                );
-              }
-              for (const node of nodes) {
-                if (node.source && node.source.__typename === 'PullRequest') {
-                  connected.push({ number: node.source.number, type: 'pr' });
-                }
-              }
-              return connected;
-            }
-
-            const connectedItems = await getConnectedItems();
             core.info(
               `Found ${connectedItems.length} connected item(s): ` +
               (connectedItems.map(i => `#${i.number} (${i.type})`).join(', ') || 'none')
@@ -155,50 +374,7 @@ jobs:
             // ── Sync status labels to each connected item ─────────────────────────
 
             for (const item of connectedItems) {
-              const { data: itemData } = await github.rest.issues.get({
-                owner,
-                repo,
-                issue_number: item.number,
-              });
-
-              const itemStatusLabels = itemData.labels
-                .map(l => l.name)
-                .filter(n => n.startsWith('Status: '));
-
-              // Skip if already identical
-              const alreadySynced =
-                effectiveStatusLabels.length === itemStatusLabels.length &&
-                effectiveStatusLabels.every(l => itemStatusLabels.includes(l));
-
-              if (alreadySynced) {
-                core.info(`#${item.number} already in sync – skipping.`);
-                continue;
-              }
-
-              // Remove stale status labels
-              for (const stale of itemStatusLabels) {
-                if (!effectiveStatusLabels.includes(stale)) {
-                  core.info(`Removing "${stale}" from #${item.number}`);
-                  await github.rest.issues.removeLabel({
-                    owner,
-                    repo,
-                    issue_number: item.number,
-                    name: stale,
-                  });
-                }
-              }
-
-              // Add any missing status labels
-              const labelsToAdd = effectiveStatusLabels.filter(l => !itemStatusLabels.includes(l));
-              if (labelsToAdd.length > 0) {
-                core.info(`Adding [${labelsToAdd.join(', ')}] to #${item.number}`);
-                await github.rest.issues.addLabels({
-                  owner,
-                  repo,
-                  issue_number: item.number,
-                  labels: labelsToAdd,
-                });
-              }
+              await syncExactStatusLabels(item.number, effectiveStatusLabels);
 
               // Comment for traceability
               const syncedLabels = effectiveStatusLabels.length > 0
