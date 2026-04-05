@@ -25,6 +25,18 @@ print_banner() {
     echo -e "${NC}"
 }
 
+print_mode_info() {
+    local mode="$1"
+    if [ "$mode" = "dev" ]; then
+        echo -e "  ${BLUE}ℹ${NC}  Development mode enabled — installing Node/Python dependencies"
+    elif [ "$mode" = "local" ]; then
+        echo -e "  ${BLUE}ℹ${NC}  Local build mode enabled — building containers locally"
+    else
+        echo -e "  ${BLUE}ℹ${NC}  Minimal GHCR deployment (default) — using pre-built images"
+    fi
+    echo ""
+}
+
 info()    { echo -e "  ${BLUE}ℹ${NC}  $1"; }
 success() { echo -e "  ${GREEN}✓${NC}  $1"; }
 warn()    { echo -e "  ${YELLOW}!${NC}  $1"; }
@@ -54,19 +66,69 @@ generate_password() {
     cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | head -c 20
 }
 
+usage() {
+    cat <<'EOF'
+Sonicverse Radio Streaming Stack Installer
+
+Usage:
+  ./install.sh [OPTIONS]
+
+Options:
+  --dev              Install Node/Python dependencies for local development.
+                     Required for: building dashboard, running analytics/API locally.
+                     Skip this if using GHCR pre-built images (recommended for deployment).
+  --build-local      Build container images locally instead of pulling from GHCR.
+                     Use this if you need to modify Dockerfile or container code.
+  -h, --help         Show this help message.
+
+Deployment scenarios:
+  Minimal GHCR deployment (easiest, default):
+    $ ./install.sh
+
+  Full development environment:
+    $ ./install.sh --dev
+
+  Build containers locally (advanced):
+    $ ./install.sh --build-local
+
+EOF
+}
+
 TOTAL_STEPS=6
 
 # Parse flags
-USE_PREBUILT=false
+USE_PREBUILT=true
+DEV_MODE=false
 for arg in "$@"; do
     case "$arg" in
-        --use-prebuilt) USE_PREBUILT=true ;;
+        --build-local) USE_PREBUILT=false ;;
+        --dev) DEV_MODE=true ;;
+        -h|--help) usage; exit 0 ;;
+        *)
+            echo "Error: Unknown option '$arg'" >&2
+            echo "Use --help for usage information." >&2
+            exit 1
+            ;;
     esac
 done
+
+# Adjust total steps based on whether we're installing dev dependencies
+TOTAL_STEPS=6
+if [ "$DEV_MODE" = "true" ]; then
+    TOTAL_STEPS=7
+fi
 
 # ============================================================
 
 print_banner
+
+if [ "$DEV_MODE" = "true" ]; then
+    print_mode_info "dev"
+elif [ "$USE_PREBUILT" = "false" ]; then
+    print_mode_info "local"
+else
+    print_mode_info "ghcr"
+fi
 
 # ----------------------------------------------------------
 # Detect existing installation
@@ -315,9 +377,30 @@ ENVFILE
 fi
 
 # ----------------------------------------------------------
-# Step 3: Emergency fallback audio
+# Step 3: Install development dependencies (optional)
 # ----------------------------------------------------------
-step 3 "Emergency fallback audio"
+STEP_NUM=3
+if [ "$DEV_MODE" = "true" ]; then
+    step "$STEP_NUM" "Installing development dependencies"
+    echo ""
+    info "Installing Node.js and Python dependencies..."
+    echo ""
+    if [ -f "install-all.sh" ]; then
+        bash ./install-all.sh
+        success "Development dependencies installed"
+    else
+        error "install-all.sh not found"
+        exit 1
+    fi
+    STEP_NUM=$((STEP_NUM + 1))
+else
+    info "Skipping development dependencies (use --dev to install)"
+fi
+
+# ----------------------------------------------------------
+# Step $STEP_NUM: Emergency fallback audio
+# ----------------------------------------------------------
+step "$STEP_NUM" "Emergency fallback audio"
 
 if ls emergency-audio/*.mp3 emergency-audio/*.flac emergency-audio/*.wav 2>/dev/null | head -1 &>/dev/null; then
     success "Fallback audio found in emergency-audio/"
@@ -333,29 +416,35 @@ else
     fi
 fi
 
+# Increment to next step
+STEP_NUM=$((STEP_NUM + 1))
+
 # ----------------------------------------------------------
-# Step 4: Build containers
+# Step $STEP_NUM: Build containers
 # ----------------------------------------------------------
-step 4 "Building containers"
+step "$STEP_NUM" "Building containers"
 
 if [ "$USE_PREBUILT" = "true" ]; then
     info "Pulling pre-built images from GHCR..."
     echo ""
-    docker compose pull || { error "Pull failed. Images may not exist yet. Run without --use-prebuilt to build locally."; exit 1; }
+    docker compose pull || { error "Pull failed. Images may not exist yet. Run with --build-local to build locally instead."; exit 1; }
     echo ""
     success "All images pulled from GHCR"
 else
-    info "This may take a few minutes on first run..."
+    info "Building containers locally. This may take a few minutes on first run..."
     echo ""
     docker compose build
     echo ""
     success "All containers built successfully"
 fi
 
+# Increment to next step
+STEP_NUM=$((STEP_NUM + 1))
+
 # ----------------------------------------------------------
-# Step 5: SSL certificate
+# Step $STEP_NUM: SSL certificate
 # ----------------------------------------------------------
-step 5 "SSL certificate"
+step "$STEP_NUM" "SSL certificate"
 
 # Source .env for hostname
 source .env 2>/dev/null || true
@@ -391,10 +480,13 @@ else
     fi
 fi
 
+# Increment to next step
+STEP_NUM=$((STEP_NUM + 1))
+
 # ----------------------------------------------------------
-# Step 6: Launch
+# Step $STEP_NUM: Launch
 # ----------------------------------------------------------
-step 6 "Launch"
+step "$STEP_NUM" "Launch"
 
 echo ""
 read -rp "  → Start the streaming stack now? (Y/n): " start_now
