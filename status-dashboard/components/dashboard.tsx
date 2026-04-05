@@ -118,7 +118,6 @@ export function Dashboard() {
     setCmdRunning(null);
   }
 
-  const hostname = config?.hostname || "<host>";
   const canManageEmergencyAudio = config?.can_manage_emergency_audio ?? false;
 
   return (

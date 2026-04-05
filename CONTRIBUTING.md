@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing. This document covers how to get started, submit changes, and report issues.
 
+If you are using an AI coding agent, also follow [AGENTS.md](AGENTS.md).
+
 ## Getting Started
 
 1. Fork the repository and clone your fork

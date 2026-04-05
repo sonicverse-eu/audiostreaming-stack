@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx --max-warnings=0"
   },
   "dependencies": {
     "appwrite": "^15.0.0",
@@ -22,7 +22,7 @@
     "@tailwindcss/postcss": "^4.0.0",
     "typescript": "^5.7.0",
     "postcss": "^8.0.0",
-    "eslint": "^9.0.0",
+    "eslint": "^8.57.1",
     "eslint-config-next": "^15.0.0"
   }
 }
