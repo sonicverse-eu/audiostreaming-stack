@@ -22,7 +22,7 @@
     "@tailwindcss/postcss": "^4.0.0",
     "typescript": "^6.0.2",
     "postcss": "^8.0.0",
-    "eslint": "^8.57.1",
+    "eslint": "^10.2.0",
     "eslint-config-next": "^15.0.0"
   }
 }
