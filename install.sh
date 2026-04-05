@@ -29,9 +29,10 @@ print_mode_info() {
     local mode="$1"
     if [ "$mode" = "dev" ]; then
         echo -e "  ${BLUE}ℹ${NC}  Development mode enabled — installing Node/Python dependencies"
+    elif [ "$mode" = "local" ]; then
+        echo -e "  ${BLUE}ℹ${NC}  Local build mode enabled — building containers locally"
     else
-        echo -e "  ${BLUE}ℹ${NC}  Deployment mode (minimal) — skipping dev dependencies"
-        echo -e "  ${BLUE}ℹ${NC}  To install dev deps, run: ./install.sh --dev"
+        echo -e "  ${BLUE}ℹ${NC}  Minimal GHCR deployment (default) — using pre-built images"
     fi
     echo ""
 }
@@ -123,8 +124,10 @@ print_banner
 
 if [ "$DEV_MODE" = "true" ]; then
     print_mode_info "dev"
+elif [ "$USE_PREBUILT" = "false" ]; then
+    print_mode_info "local"
 else
-    print_mode_info "deploy"
+    print_mode_info "ghcr"
 fi
 
 # ----------------------------------------------------------
@@ -423,11 +426,11 @@ step "$STEP_NUM" "Building containers"
 if [ "$USE_PREBUILT" = "true" ]; then
     info "Pulling pre-built images from GHCR..."
     echo ""
-    docker compose pull || { error "Pull failed. Images may not exist yet. Run without --use-prebuilt to build locally."; exit 1; }
+    docker compose pull || { error "Pull failed. Images may not exist yet. Run with --build-local to build locally instead."; exit 1; }
     echo ""
     success "All images pulled from GHCR"
 else
-    info "This may take a few minutes on first run..."
+    info "Building containers locally. This may take a few minutes on first run..."
     echo ""
     docker compose build
     echo ""
