@@ -46,6 +46,79 @@ jobs:
               return numbers;
             }
 
+            // ── Helper: collect issue links from PR metadata/timeline (same repo) ───
+            // Covers links created outside plain body keywords, such as GitHub-linked
+            // issue references visible on the PR.
+            async function getLinkedIssueNumbersForPR(prNumber) {
+              const query = `
+                query($owner: String!, $repo: String!, $number: Int!) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      closingIssuesReferences(first: 100) {
+                        nodes {
+                          number
+                          repository {
+                            owner { login }
+                            name
+                          }
+                        }
+                        pageInfo { hasNextPage }
+                      }
+                      timelineItems(first: 100, itemTypes: [CROSS_REFERENCED_EVENT]) {
+                        nodes {
+                          ... on CrossReferencedEvent {
+                            source {
+                              __typename
+                              ... on Issue {
+                                number
+                                repository {
+                                  owner { login }
+                                  name
+                                }
+                              }
+                            }
+                          }
+                        }
+                        pageInfo { hasNextPage }
+                      }
+                    }
+                  }
+                }
+              `;
+
+              const result = await github.graphql(query, { owner, repo, number: prNumber });
+              const prData = result.repository.pullRequest;
+              const linked = new Set();
+
+              for (const issue of prData.closingIssuesReferences.nodes) {
+                if (!issue?.repository) continue;
+                if (issue.repository.owner.login === owner && issue.repository.name === repo) {
+                  linked.add(issue.number);
+                }
+              }
+
+              for (const node of prData.timelineItems.nodes) {
+                const src = node?.source;
+                if (!src || src.__typename !== 'Issue' || !src.repository) continue;
+                if (src.repository.owner.login === owner && src.repository.name === repo) {
+                  linked.add(src.number);
+                }
+              }
+
+              if (prData.closingIssuesReferences.pageInfo.hasNextPage) {
+                core.warning(
+                  `PR #${prNumber} has more than 100 closing issue references; some links may not have been synced.`
+                );
+              }
+              if (prData.timelineItems.pageInfo.hasNextPage) {
+                core.warning(
+                  `PR #${prNumber} has more than 100 cross-reference events; some links may not have been synced.`
+                );
+              }
+
+              return Array.from(linked);
+            }
+
             // ── Helper: add missing labels to a PR/issue (no-op if already present) ─
             async function applyMissingLabels(itemNumber, sourceLabels, sourceNumber) {
               if (sourceLabels.length === 0) return;
@@ -123,9 +196,14 @@ jobs:
                 return;
               }
 
-              const linkedIssueNumbers = parseLinkedIssueNumbers(pr.body);
+              const bodyLinkedIssueNumbers = parseLinkedIssueNumbers(pr.body);
+              const metadataLinkedIssueNumbers = await getLinkedIssueNumbersForPR(pr.number);
+              const linkedIssueNumbers = Array.from(
+                new Set([...bodyLinkedIssueNumbers, ...metadataLinkedIssueNumbers])
+              );
+
               core.info(
-                `Linked issue numbers found in PR body: ` +
+                `Linked issue numbers found for PR: ` +
                 (linkedIssueNumbers.length > 0 ? linkedIssueNumbers.join(', ') : 'none')
               );
 
