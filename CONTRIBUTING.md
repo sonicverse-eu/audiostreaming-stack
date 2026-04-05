@@ -8,31 +8,43 @@ If you are using an AI coding agent, also follow [AGENTS.md](AGENTS.md).
 
 ## Getting Started
 
+### Option A: Full interactive setup (recommended for most contributors)
+
+```bash
+git clone https://github.com/sonicverse-eu/audiostreaming-stack.git
+cd audiostreaming-stack
+./install.sh --dev
+```
+
+This installs Node/Python dependencies and walks you through stack configuration interactively.
+
+### Option B: Manual setup (for advanced users)
+
 1. Fork the repository and clone your fork
 2. Install local development dependencies from the repository root:
 
    ```bash
-    ./install-dev-deps.sh
-    ```
+   ./install-dev-deps.sh
+   ```
 
-    Compatibility alias (same behavior): `./install-all.sh`
+   Compatibility alias (same behavior): `./install-all.sh`
 
    On Windows PowerShell, use:
 
    ```powershell
-    .\install-dev-deps.ps1
-    ```
+   .\install-dev-deps.ps1
+   ```
 
-    Compatibility alias (same behavior): `.\install-all.ps1`
+   Compatibility alias (same behavior): `.\install-all.ps1`
 
 3. Copy `.env.example` to `.env` and fill in your values
 4. Add at least one fallback audio file to `emergency-audio/` (MP3, FLAC, or WAV)
 5. Build and start the stack:
 
    ```bash
-    docker compose build
-    docker compose up -d
-    ```
+   docker compose build
+   docker compose up -d
+   ```
 
 ## Development Workflow
 
