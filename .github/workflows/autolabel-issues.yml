@@ -22,9 +22,25 @@ jobs:
             const { owner, repo } = context.repo;
             const issue = context.payload.issue;
 
-            // Skip bot-created issues
-            if (issue.user.type === 'Bot') {
-              core.info('Issue created by a bot – skipping.');
+            // Skip issues created or edited by automation actors.
+            // GitHub Copilot Cloud Agent can appear either as a Bot-type GitHub App
+            // (login ending in "[bot]") or – when acting on behalf of a user through
+            // Copilot Workspace/Cloud Agent – as a regular user but with context.actor
+            // still revealing the automation.  Checking both covers all known cases.
+            function isAutomationActor(login) {
+              if (!login) return false;
+              return login.endsWith('[bot]') || /^copilot[-_\s]/i.test(login);
+            }
+
+            if (
+              issue.user.type === 'Bot' ||
+              isAutomationActor(issue.user.login) ||
+              isAutomationActor(context.actor)
+            ) {
+              core.info(
+                `Automation actor detected ` +
+                `(issue author: ${issue.user.login}, workflow actor: ${context.actor}) – skipping.`
+              );
               return;
             }
 

@@ -21,9 +21,17 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
 
-            // Avoid infinite loops caused by bot-triggered label events
-            if (context.actor === 'github-actions[bot]') {
-              core.info('Triggered by bot – skipping to prevent loop.');
+            // Avoid infinite loops caused by automation-triggered label events.
+            // Copilot Cloud Agent connects as a GitHub App whose login ends in "[bot]"
+            // or matches a "copilot-" prefix, so we guard on both patterns in addition
+            // to the standard github-actions[bot] actor.
+            function isAutomationActor(login) {
+              if (!login) return false;
+              return login.endsWith('[bot]') || /^copilot[-_\s]/i.test(login);
+            }
+
+            if (isAutomationActor(context.actor)) {
+              core.info(`Triggered by automation actor (${context.actor}) – skipping to prevent loop.`);
               return;
             }
 
