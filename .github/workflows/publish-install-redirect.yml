@@ -1,0 +1,55 @@
+name: Publish Installation Redirect
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - install-redirect.html
+      - .github/workflows/publish-install-redirect.yml
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy-redirect:
+    name: Publish to GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Create pages directory
+        run: |
+          mkdir -p public
+          cp install-redirect.html public/install.html
+          
+          # Create alternative paths for SEO and discoverability
+          mkdir -p public/install-audiostack
+          cp install-redirect.html public/install-audiostack/index.html
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'public'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify deployment
+        run: |
+          echo "Installation redirect published:"
+          echo "  https://sonicverse-eu.github.io/install.html"
+          echo "  https://sonicverse-eu.github.io/install-audiostack/"

@@ -95,6 +95,22 @@ Adaptive bitrate with 3 AAC quality tiers — players automatically select the b
 
 Choose your setup based on your needs:
 
+### ⚡ One-liner Installation (Fastest!)
+
+For the quickest setup with minimal typing:
+
+```bash
+bash <(curl -fsSL https://sonicverse.short.gy/install-audiostack)
+```
+
+This works from any directory and automatically handles cloning the repository, checking prerequisites, and configuring your stack. Equivalent to the "Minimal GHCR deployment" option below.
+
+**Features:**
+- Works from any directory (automatic git clone)
+- Interactive configuration
+- Installs only essentials for running (no development dependencies)
+- ~2–5 minutes total
+
 ### 🚀 Recommended: Minimal GHCR deployment (default)
 
 Fastest option for production deployments — no building or local dependencies required:
@@ -120,6 +136,12 @@ This installs **only what's needed to run**:
 
 If you plan to modify the dashboard, analytics, or API:
 
+**Via short link:**
+```bash
+bash <(curl -fsSL https://sonicverse.short.gy/install-audiostack) --dev
+```
+
+**Or clone first:**
 ```bash
 git clone https://github.com/sonicverse-eu/audiostreaming-stack.git
 cd audiostreaming-stack
@@ -136,6 +158,17 @@ This includes everything above **plus**:
 
 Build container images locally instead of pulling from GHCR — use this if you need to modify Dockerfile or container code:
 
+**Via short link:**
+```bash
+bash <(curl -fsSL https://sonicverse.short.gy/install-audiostack) --build-local
+```
+
+**Or to combine with dev dependencies:**
+```bash
+bash <(curl -fsSL https://sonicverse.short.gy/install-audiostack) --build-local --dev
+```
+
+**Or clone first:**
 ```bash
 git clone https://github.com/sonicverse-eu/audiostreaming-stack.git
 cd audiostreaming-stack

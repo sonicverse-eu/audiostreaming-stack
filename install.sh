@@ -2,6 +2,7 @@
 
 # ============================================================
 # Sonicverse — Radio Audio Streaming Stack Installer
+# Remote-safe installation script compatible with curl piping
 # ============================================================
 
 set -e
@@ -14,6 +15,45 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
+
+# ============================================================
+# Remote Execution Detection & Setup
+# ============================================================
+# If being run via 'curl | bash' (stdin is not a terminal),
+# clone the repository first and recursively call the cloned script.
+read -t 0 _ 2>/dev/null && STDIN_AVAILABLE=true || STDIN_AVAILABLE=false
+
+if [ "$STDIN_AVAILABLE" = "true" ] || [ -f "docker-compose.yml" ]; then
+    # stdin is available (interactive) OR we're already in the repo directory
+    RUNNING_LOCALLY=true
+    WORK_DIR="$(pwd)"
+else
+    # stdin is piped (from curl), and not in repo directory
+    RUNNING_LOCALLY=false
+    
+    # Define minimal info/error for remote setup
+    _info() { echo -e "  ${BLUE}ℹ${NC}  $1"; }
+    _error() { echo -e "  ${RED}✗${NC}  $1"; }
+    
+    # Create a temporary directory for the clone
+    WORK_DIR="/tmp/audiostreaming-stack-$(date +%s)"
+    mkdir -p "$WORK_DIR"
+    
+    _info "Cloning audiostreaming-stack to $WORK_DIR"
+    
+    # Clone the repository with shallow clone for speed
+    if ! git clone --depth 1 https://github.com/sonicverse-eu/audiostreaming-stack.git "$WORK_DIR" 2>/dev/null; then
+        _error "Failed to clone repository. Ensure git is installed and you have internet connectivity."
+        exit 1
+    fi
+    
+    _info "Starting installer from cloned repository..."
+    
+    # Execute the script from within the cloned directory
+    cd "$WORK_DIR"
+    bash ./install.sh "$@"
+    exit $?
+fi
 
 print_banner() {
     echo ""
