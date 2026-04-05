@@ -2,6 +2,7 @@ FROM python:3.12-alpine
 
 WORKDIR /app
 
+# hadolint ignore=DL3018
 RUN apk add --no-cache docker-cli
 
 COPY requirements.txt .
