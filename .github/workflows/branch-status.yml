@@ -1,0 +1,119 @@
+name: Branch Status
+
+on:
+  create:
+  push:
+    branches-ignore: [main, master]
+
+jobs:
+  set-in-progress:
+    name: 'Set "Status: In Progress" when a branch references an issue'
+    runs-on: ubuntu-latest
+    # Only act on branch creation; the push trigger covers branches created
+    # without a separate "create" event (e.g. first push of a new remote branch).
+    if: >-
+      (github.event_name == 'create' && github.event.ref_type == 'branch') ||
+      github.event_name == 'push'
+    permissions:
+      issues: write
+
+    steps:
+      - name: Set Status In Progress on linked issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            // Resolve the branch name from either event type
+            const branch = context.eventName === 'create'
+              ? context.payload.ref
+              : context.payload.ref.replace('refs/heads/', '');
+
+            core.info(`Branch: ${branch}`);
+
+            // Extract all digit sequences from the branch name as candidate issue numbers.
+            // Handles patterns like: 123-fix-thing, feat/123-desc, fix/issue-123, issue/42, 42
+            const candidates = [...branch.matchAll(/\b(\d+)\b/g)].map(m => parseInt(m[1], 10));
+
+            if (candidates.length === 0) {
+              core.info('No issue number found in branch name – skipping.');
+              return;
+            }
+
+            core.info(`Candidate issue numbers: ${candidates.join(', ')}`);
+
+            const STATUS_LABEL = 'Status: In Progress';
+
+            for (const issueNumber of candidates) {
+              let issueData;
+              try {
+                const { data } = await github.rest.issues.get({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                });
+                issueData = data;
+              } catch {
+                core.info(`#${issueNumber} not found or is a PR – skipping.`);
+                continue;
+              }
+
+              // Ignore pull requests (the API returns PRs via issues endpoint too)
+              if (issueData.pull_request) {
+                core.info(`#${issueNumber} is a PR – skipping.`);
+                continue;
+              }
+
+              if (issueData.state === 'closed') {
+                core.info(`#${issueNumber} is closed – skipping.`);
+                continue;
+              }
+
+              const existingLabels = issueData.labels.map(l => l.name);
+              const existingStatusLabels = existingLabels.filter(l => l.startsWith('Status: '));
+
+              if (existingStatusLabels.includes(STATUS_LABEL)) {
+                core.info(`#${issueNumber} already has "${STATUS_LABEL}" – skipping.`);
+                continue;
+              }
+
+              // Remove any other Status: labels (enforce single-label rule)
+              for (const stale of existingStatusLabels) {
+                core.info(`Removing stale label "${stale}" from #${issueNumber}`);
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  name: stale,
+                });
+              }
+
+              // Ensure the label exists
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name: STATUS_LABEL });
+              } catch {
+                await github.rest.issues.createLabel({
+                  owner,
+                  repo,
+                  name: STATUS_LABEL,
+                  color: 'fbca04',
+                });
+                core.info(`Created label: ${STATUS_LABEL}`);
+              }
+
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                labels: [STATUS_LABEL],
+              });
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: `🌿 Branch \`${branch}\` was created – status automatically set to **${STATUS_LABEL}**.`,
+              });
+
+              core.info(`Set "${STATUS_LABEL}" on #${issueNumber}.`);
+            }

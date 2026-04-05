@@ -1,0 +1,165 @@
+name: AI Autolabel Issues
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+jobs:
+  autolabel:
+    name: Apply Type and Scope labels via AI
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      models: read
+
+    steps:
+      - name: Autolabel issue
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue = context.payload.issue;
+
+            // Skip bot-created issues
+            if (issue.user.type === 'Bot') {
+              core.info('Issue created by a bot – skipping.');
+              return;
+            }
+
+            // ── Allow-lists ───────────────────────────────────────────────────────
+            const TYPE_LABELS = [
+              'Type: Bug',
+              'Type: Feature',
+              'Type: Documentation',
+              'Type: Maintenance',
+              'Type: Security',
+              'Type: Performance',
+              'Type: Question',
+            ];
+
+            const SCOPE_LABELS = [
+              'Scope: icecast',
+              'Scope: liquidsoap',
+              'Scope: nginx',
+              'Scope: status-panel',
+              'Scope: status-dashboard',
+              'Scope: analytics',
+              'Scope: docker',
+              'Scope: ci',
+            ];
+
+            const ALL_AUTOLABELS = [...TYPE_LABELS, ...SCOPE_LABELS];
+
+            // ── Check for existing manually-set Type/Scope labels ─────────────────
+            const existingLabels = issue.labels.map(l => l.name);
+            const hasType = existingLabels.some(l => l.startsWith('Type: '));
+            const hasScope = existingLabels.some(l => l.startsWith('Scope: '));
+
+            if (hasType && hasScope) {
+              core.info('Issue already has both Type and Scope labels – skipping AI.');
+              return;
+            }
+
+            // ── Call GitHub Models API ────────────────────────────────────────────
+            const prompt = [
+              'You are a GitHub issue labeler for an audiostreaming Docker stack project.',
+              'The project services are: icecast, liquidsoap, nginx, status-panel, status-dashboard, analytics.',
+              '',
+              'Given the issue below, reply with a JSON object with these exact keys:',
+              '  "type"  – exactly one value from: ' + TYPE_LABELS.join(', '),
+              '  "scopes" – an array (1–3 items) from: ' + SCOPE_LABELS.join(', '),
+              '',
+              'Rules:',
+              '- If the issue clearly maps to one service, set that scope only.',
+              '- If it spans multiple services or is infrastructure-wide, list all relevant ones.',
+              '- If scope cannot be determined, use "Scope: docker".',
+              '- Reply ONLY with the JSON object. No explanation, no markdown fences.',
+              '',
+              `Issue title: ${issue.title}`,
+              '',
+              `Issue body:\n${(issue.body || '').slice(0, 3000)}`,
+            ].join('\n');
+
+            let aiResult;
+            try {
+              const response = await fetch(
+                'https://models.inference.ai.azure.com/chat/completions',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+                  },
+                  body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: 0,
+                    max_tokens: 128,
+                  }),
+                }
+              );
+
+              if (!response.ok) {
+                const text = await response.text();
+                core.warning(`GitHub Models API error ${response.status}: ${text}`);
+                return;
+              }
+
+              const data = await response.json();
+              const raw = data.choices?.[0]?.message?.content?.trim();
+              core.info(`AI raw response: ${raw}`);
+              aiResult = JSON.parse(raw);
+            } catch (err) {
+              core.warning(`Failed to call or parse AI response: ${err.message}`);
+              return;
+            }
+
+            // ── Validate AI output ────────────────────────────────────────────────
+            const chosenType = TYPE_LABELS.includes(aiResult.type) ? aiResult.type : null;
+            const chosenScopes = (Array.isArray(aiResult.scopes) ? aiResult.scopes : [])
+              .filter(s => SCOPE_LABELS.includes(s));
+
+            if (!chosenType && chosenScopes.length === 0) {
+              core.warning('AI returned no valid labels – skipping.');
+              return;
+            }
+
+            // ── Ensure labels exist in the repo, create if missing ────────────────
+            async function ensureLabel(name, color) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name });
+              } catch {
+                await github.rest.issues.createLabel({ owner, repo, name, color });
+                core.info(`Created label: ${name}`);
+              }
+            }
+
+            const labelsToApply = [];
+
+            if (chosenType && !hasType) {
+              await ensureLabel(chosenType, 'e4e669');
+              labelsToApply.push(chosenType);
+            }
+
+            if (chosenScopes.length > 0 && !hasScope) {
+              for (const s of chosenScopes) {
+                await ensureLabel(s, '0075ca');
+                labelsToApply.push(s);
+              }
+            }
+
+            if (labelsToApply.length === 0) {
+              core.info('No new labels to apply.');
+              return;
+            }
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: issue.number,
+              labels: labelsToApply,
+            });
+
+            core.info(`Applied labels to #${issue.number}: ${labelsToApply.join(', ')}`);
