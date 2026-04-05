@@ -27,7 +27,13 @@ jobs:
               return;
             }
 
-            const labelName = context.payload.label.name;
+            // GitHub always populates payload.label for labeled/unlabeled events,
+            // but guard defensively in case of unexpected payload shapes.
+            const labelName = context.payload.label?.name;
+            if (!labelName) {
+              core.info('No label found in payload – skipping.');
+              return;
+            }
             if (!labelName.startsWith('Status: ')) {
               core.info(`Label "${labelName}" is not a Status label – skipping.`);
               return;
@@ -90,12 +96,14 @@ jobs:
 
             async function getConnectedItems() {
               const connected = [];
-              // PRs that cross-reference this issue
+              // PRs that cross-reference this issue.
+              // 100 is the maximum page size; issues with more than 100 cross-references
+              // may not have all linked PRs synced in a single run.
               const query = `
                 query($owner: String!, $repo: String!, $number: Int!) {
                   repository(owner: $owner, name: $repo) {
                     issue(number: $number) {
-                      timelineItems(first: 50, itemTypes: [CROSS_REFERENCED_EVENT]) {
+                      timelineItems(first: 100, itemTypes: [CROSS_REFERENCED_EVENT]) {
                         nodes {
                           ... on CrossReferencedEvent {
                             source {
