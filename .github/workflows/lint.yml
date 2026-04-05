@@ -139,7 +139,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pip install yamllint
-      - run: yamllint -c .yamllint.yml docker-compose.yml .github/workflows/
+      - run: |
+          set -e
+          git ls-files '*.yml' '*.yaml' | xargs -r yamllint -c .yamllint.yml
 
   docs-only:
     name: Docs-only PR optimization

@@ -322,7 +322,7 @@ To reduce CI time and avoid unnecessary jobs, pull request checks are scoped by 
    - Python lint runs when `analytics/**`, `status-panel/**`, related Python requirements files, or `pyproject.toml` change.
    - TypeScript lint runs when `status-dashboard/**` or its TypeScript, ESLint, Prettier, config, or lock files change.
    - Dockerfile lint runs when any `Dockerfile` or `docker-compose.yml` changes.
-   - YAML lint runs when any `*.yml` or `*.yaml` changes.
+   - YAML lint runs when any `*.yml` or `*.yaml` changes, and validates all tracked YAML files in the repository.
 - Docker Build & Push workflow mapping (PRs):
    - Builds only the services whose directories changed: `icecast/**`, `liquidsoap/**`, `nginx/**`, `status-panel/**`, `analytics/**`.
    - Builds all services when `docker-compose.yml` changes.
