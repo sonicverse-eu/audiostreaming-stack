@@ -36,5 +36,5 @@ This repository accepts AI-assisted changes, but agents should follow the same s
 ## Pull Request Expectations
 
 - Update `README.md` when behavior or configuration changes.
-- Keep the PR template checklist accurate.
+- Keep the PR template sections (Summary, Related issue) accurate and complete.
 - Reference the related issue when one exists.
