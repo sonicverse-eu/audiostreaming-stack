@@ -9,6 +9,9 @@ jobs:
   set-in-progress:
     name: 'Set "Status: In Progress" when a branch references an issue'
     runs-on: ubuntu-latest
+    concurrency:
+      group: branch-status-${{ github.repository }}-${{ github.event.ref || github.ref }}
+      cancel-in-progress: false
     # Only act on branch creation; the push trigger covers branches created
     # without a separate "create" event (e.g. first push of a new remote branch).
     if: >-
@@ -109,11 +112,29 @@ jobs:
                 labels: [STATUS_LABEL],
               });
 
+              const commentMarker = `<!-- branch-status:${branch}:${issueNumber}:in-progress -->`;
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 100,
+              });
+
+              const hasExistingBranchComment = comments.some((comment) =>
+                typeof comment.body === 'string' && comment.body.includes(commentMarker)
+              );
+
+              if (hasExistingBranchComment) {
+                core.info(`Comment already exists for #${issueNumber} + branch ${branch} – skipping comment.`);
+                core.info(`Set "${STATUS_LABEL}" on #${issueNumber}.`);
+                continue;
+              }
+
               await github.rest.issues.createComment({
                 owner,
                 repo,
                 issue_number: issueNumber,
-                body: `🌿 Branch \`${branch}\` was created – status automatically set to **${STATUS_LABEL}**.`,
+                body: `${commentMarker}\n🌿 Branch \`${branch}\` was created – status automatically set to **${STATUS_LABEL}**.`,
               });
 
               core.info(`Set "${STATUS_LABEL}" on #${issueNumber}.`);
