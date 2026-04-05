@@ -33,6 +33,8 @@ jobs:
             context: ./nginx
           - name: status-panel
             context: ./status-panel
+            # Mounts the Docker socket at runtime — only meaningful on amd64 hosts
+            platforms: linux/amd64
           - name: analytics
             context: ./analytics
 

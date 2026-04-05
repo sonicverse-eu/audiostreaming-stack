@@ -24,9 +24,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "npm"
-          cache-dependency-path: status-dashboard/package.json
-      - run: npm ci
+      - run: npm install
         working-directory: status-dashboard
       - run: npm run lint
         working-directory: status-dashboard
