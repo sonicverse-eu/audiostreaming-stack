@@ -93,7 +93,11 @@ Adaptive bitrate with 3 AAC quality tiers — players automatically select the b
 
 ## Quick Start
 
-### Option A — Pull pre-built images from GHCR (fastest)
+Choose your setup based on your needs:
+
+### 🚀 Recommended: Deploy with GHCR images (minimal)
+
+Fastest option for production deployments — no building or local dependencies required:
 
 ```bash
 git clone https://github.com/sonicverse-eu/audiostreaming-stack.git
@@ -101,7 +105,36 @@ cd audiostreaming-stack
 ./install.sh --use-prebuilt
 ```
 
-### Option B — Build locally
+This installs **only what's needed to run**:
+- Docker/Docker Compose (auto-installed if missing)
+- Configuration file (`.env`)
+- Pre-built images from GHCR
+
+**What's _not_ installed:**
+- Node.js / npm (dashboard already built into image)
+- Python / pip (analytics & API already built into image)
+
+**Time:** ~2–5 minutes (mostly downloading ~500MB of container images)
+
+### 📦 Full development environment
+
+If you plan to modify the dashboard, analytics, or API:
+
+```bash
+git clone https://github.com/sonicverse-eu/audiostreaming-stack.git
+cd audiostreaming-stack
+./install.sh --dev
+```
+
+This includes everything above **plus**:
+- Node.js dependencies (dashboard development)
+- Python dependencies (analytics & API development)
+
+**Time:** ~5–10 minutes depending on your network and system
+
+### 🔨 Local build without dev setup
+
+Build containers locally but don't install development dependencies:
 
 ```bash
 git clone https://github.com/sonicverse-eu/audiostreaming-stack.git
@@ -109,7 +142,9 @@ cd audiostreaming-stack
 ./install.sh
 ```
 
-The installer walks you through Docker checks, configuration, SSL setup, and launching the stack interactively.
+Use this if you want to modify container code (Dockerfile, liquidsoap config, etc.) without modifying the dashboard/API application code.
+
+**Time:** ~15–30 minutes (building ~3 container images locally)
 
 ### Manual setup
 
@@ -151,35 +186,61 @@ The installer walks you through Docker checks, configuration, SSL setup, and lau
    - Test stream: `http://<host>/listen/stream-mp3-128` in VLC
    - HLS: `http://<host>/hls/live.m3u8` in Safari/VLC
 
-## Install Development Dependencies From Root
+## Install Development Dependencies Separately
 
-Use the root installers when you only need local development dependencies (without running the full interactive stack installer):
+If you've already run `./install.sh` without `--dev` and now want to install development dependencies:
 
 ```bash
 ./install-dev-deps.sh
 ```
 
-Compatibility alias (same behavior): `./install-all.sh`
+Or use the equivalent alias:
 
-This installs:
+```bash
+./install-all.sh
+```
 
-- `dashboard` JavaScript dependencies from `apps/dashboard` (auto-detects `npm`, `yarn`, or `pnpm` lockfiles)
-- `analytics` Python dependencies from `services/analytics/requirements.txt`
-- `status-api` Python dependencies from `apps/status-api/requirements.txt`
+These scripts install (according to your needs):
+- **Node.js** dependencies for the dashboard (`apps/dashboard/`)
+- **Python** dependencies for analytics and status API (`services/analytics/`, `apps/status-api/`)
+
+**When to use:**
+- After a minimal deployment if you want to edit the dashboard or APIs
+- For local development without using the full interactive installer
+- For CI/CD pipelines
 
 Optional flags:
 
-- `./install-dev-deps.sh --ci` for deterministic CI-friendly installs when lockfiles exist
-- `./install-dev-deps.sh --python-user` to install Python packages with `--user`
-- `./install-dev-deps.sh --skip-node` or `./install-dev-deps.sh --skip-python` for partial installs
+- `--ci` for deterministic CI-friendly installs (uses lockfiles like `package-lock.json`, `pnpm-lock.yaml`)
+- `--python-user` to install Python packages with `--user`
+- `--skip-node` to skip JavaScript dependency installation
+- `--skip-python` to skip Python dependency installation
 
-On Windows PowerShell:
+**Examples:**
+
+```bash
+# Development: install everything
+./install-all.sh
+
+# CI: deterministic installs
+./install-all.sh --ci
+
+# API-only development (skip dashboard)
+./install-all.sh --skip-node
+
+# Dashboard-only development (skip backend services)
+./install-all.sh --skip-python
+```
+
+**Windows PowerShell:**
 
 ```powershell
 .\install-dev-deps.ps1
+# or
+.\install-all.ps1
 ```
 
-Compatibility alias (same behavior): `.\install-all.ps1`
+Same flags as above are supported.
 
 ## Prerequisites
 
