@@ -320,7 +320,7 @@ To reduce CI time and avoid unnecessary jobs, pull request checks are scoped by 
 - Documentation-only changes (`docs/**` or `**/*.md`) run only lightweight "docs-only" marker jobs and skip code/build jobs.
 - Lint workflow mapping:
    - Python lint runs when `analytics/**`, `status-panel/**`, related Python requirements files, or `pyproject.toml` change.
-   - TypeScript lint runs when `status-dashboard/**` or its config/lock files change.
+   - TypeScript lint runs when `status-dashboard/**` or its TypeScript, ESLint, Prettier, config, or lock files change.
    - Dockerfile lint runs when any `Dockerfile` or `docker-compose.yml` changes.
    - YAML lint runs when any `*.yml` or `*.yaml` changes.
 - Docker Build & Push workflow mapping (PRs):
