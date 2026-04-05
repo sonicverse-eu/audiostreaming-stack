@@ -1,8 +1,8 @@
 ---
 name: Bug report
 about: Something is broken
-title: "[bug] "
-labels: ["bug"]
+title: ""
+labels: ["Type: Bug"]
 assignees: []
 ---
 
