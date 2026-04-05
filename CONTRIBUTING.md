@@ -7,13 +7,30 @@ If you are using an AI coding agent, also follow [AGENTS.md](AGENTS.md).
 ## Getting Started
 
 1. Fork the repository and clone your fork
-2. Copy `.env.example` to `.env` and fill in your values
-3. Add at least one fallback audio file to `emergency-audio/` (MP3, FLAC, or WAV)
-4. Build and start the stack:
+2. Install local development dependencies from the repository root:
+
    ```bash
-   docker compose build
-   docker compose up -d
-   ```
+    ./install-dev-deps.sh
+    ```
+
+    Compatibility alias (same behavior): `./install-all.sh`
+
+   On Windows PowerShell, use:
+
+   ```powershell
+    .\install-dev-deps.ps1
+    ```
+
+    Compatibility alias (same behavior): `.\install-all.ps1`
+
+3. Copy `.env.example` to `.env` and fill in your values
+4. Add at least one fallback audio file to `emergency-audio/` (MP3, FLAC, or WAV)
+5. Build and start the stack:
+
+   ```bash
+    docker compose build
+    docker compose up -d
+    ```
 
 ## Development Workflow
 

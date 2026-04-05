@@ -131,6 +131,36 @@ The installer walks you through Docker checks, configuration, SSL setup, and lau
    - Test stream: `http://<host>/listen/stream-mp3-128` in VLC
    - HLS: `http://<host>/hls/live.m3u8` in Safari/VLC
 
+## Install Development Dependencies From Root
+
+Use the root installers when you only need local development dependencies (without running the full interactive stack installer):
+
+```bash
+./install-dev-deps.sh
+```
+
+Compatibility alias (same behavior): `./install-all.sh`
+
+This installs:
+
+- `status-dashboard` JavaScript dependencies (auto-detects `npm`, `yarn`, or `pnpm` lockfiles)
+- `analytics` Python dependencies from `analytics/requirements.txt`
+- `status-panel` Python dependencies from `status-panel/requirements.txt`
+
+Optional flags:
+
+- `./install-dev-deps.sh --ci` for deterministic CI-friendly installs when lockfiles exist
+- `./install-dev-deps.sh --python-user` to install Python packages with `--user`
+- `./install-dev-deps.sh --skip-node` or `./install-dev-deps.sh --skip-python` for partial installs
+
+On Windows PowerShell:
+
+```powershell
+.\install-dev-deps.ps1
+```
+
+Compatibility alias (same behavior): `.\install-all.ps1`
+
 ## Prerequisites
 
 ### Docker
@@ -240,6 +270,10 @@ Alerts have a 5-minute cooldown to prevent spam.
 ```
 ├── docker-compose.yml
 ├── .env.example
+├── install-dev-deps.sh
+├── install-dev-deps.ps1
+├── install-all.sh
+├── install-all.ps1
 ├── install.sh
 ├── init-letsencrypt.sh
 ├── setup-firewall.sh
