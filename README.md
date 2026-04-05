@@ -3,8 +3,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/sonicverse-eu/audiostreaming-stack/actions/workflows/lint.yml/badge.svg)](https://github.com/sonicverse-eu/audiostreaming-stack/actions/workflows/lint.yml)
 [![GHCR](https://img.shields.io/badge/Images-GHCR-blue?logo=github)](https://github.com/sonicverse-eu/audiostreaming-stack/pkgs/container/audiostreaming-stack%2Ficecast)
+[![Join Sonicverse OSS Slack](https://img.shields.io/badge/Join-Sonicverse%20OSS%20Slack-4A154B?logo=slack&logoColor=white)](https://join.slack.com/t/sonicverse-oss/shared_invite/zt-3u969i5rr-cmfgEycFAi8V7Baj0uBx0A)
 
 Self-hosted Docker Compose stack for live radio streaming. Ingest from any studio encoder, deliver via Icecast2 and HLS adaptive bitrate, with automatic fallback, silence detection, PostHog analytics, Pushover alerts, and a real-time operator dashboard.
+
+Join the Sonicverse OSS Slack for community support, implementation questions, and contributor collaboration.
 
 ## Architecture
 
