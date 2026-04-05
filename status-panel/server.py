@@ -7,17 +7,16 @@ Protected by Appwrite authentication.
 """
 
 import functools
+import glob as globmod
 import json
 import os
+import shutil
 import subprocess
 import time
 from collections import deque
 
-import glob as globmod
-import shutil
-
 import requests
-from flask import Flask, jsonify, request, Response, g
+from flask import Flask, Response, g, jsonify, request
 from flask_cors import CORS
 from werkzeug.exceptions import RequestEntityTooLarge
 

@@ -5,13 +5,12 @@ Polls Icecast stats endpoint and sends listener metrics to PostHog.
 Receives silence detection webhooks from Liquidsoap and sends Pushover alerts.
 """
 
-import json
 import os
 import sys
-import time
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
 
 import requests
 
