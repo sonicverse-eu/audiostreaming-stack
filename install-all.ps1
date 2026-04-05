@@ -8,11 +8,32 @@ param(
 $ErrorActionPreference = "Stop"
 $RootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+if ($PSVersionTable.PSVersion.Major -ge 7) {
+    $PSNativeCommandUseErrorActionPreference = $true
+}
+
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$ArgumentList
+    )
+
+    & $FilePath @ArgumentList
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command '$FilePath' failed with exit code $LASTEXITCODE."
+    }
+}
+
 function Get-PythonCommand {
     if ($env:PYTHON) {
         $cmd = Get-Command $env:PYTHON -ErrorAction SilentlyContinue
         if ($cmd) {
-            return $env:PYTHON
+            return [pscustomobject]@{
+                Exe  = $cmd.Path
+                Args = @()
+            }
         }
     }
 
@@ -21,9 +42,15 @@ function Get-PythonCommand {
         $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
         if ($cmd) {
             if ($candidate -eq "py") {
-                return "py -3"
+                return [pscustomobject]@{
+                    Exe  = $cmd.Path
+                    Args = @("-3")
+                }
             }
-            return $candidate
+            return [pscustomobject]@{
+                Exe  = $cmd.Path
+                Args = @()
+            }
         }
     }
 
@@ -46,27 +73,27 @@ function Install-NodeDeps {
     try {
         if ($manager -eq "npm") {
             if ($Ci -and (Test-Path "package-lock.json")) {
-                npm ci
+                Invoke-Native "npm" "ci"
             } else {
-                npm install
+                Invoke-Native "npm" "install"
             }
         } elseif ($manager -eq "yarn") {
             if (-not (Get-Command yarn -ErrorAction SilentlyContinue)) {
                 throw "[node] yarn.lock found but yarn is not installed."
             }
             if ($Ci) {
-                yarn install --frozen-lockfile
+                Invoke-Native "yarn" "install" "--frozen-lockfile"
             } else {
-                yarn install
+                Invoke-Native "yarn" "install"
             }
         } elseif ($manager -eq "pnpm") {
             if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
                 throw "[node] pnpm-lock.yaml found but pnpm is not installed."
             }
             if ($Ci) {
-                pnpm install --frozen-lockfile
+                Invoke-Native "pnpm" "install" "--frozen-lockfile"
             } else {
-                pnpm install
+                Invoke-Native "pnpm" "install"
             }
         }
     }
@@ -82,14 +109,17 @@ function Install-PythonDeps {
         (Join-Path $RootDir "status-panel/requirements.txt")
     )
 
-    Write-Host "[python] Installing dependencies with $pythonCmd"
+    Write-Host "[python] Installing dependencies with $($pythonCmd.Exe)"
 
     foreach ($requirementsFile in $requirements) {
+        $arguments = @($pythonCmd.Args)
+        $arguments += @("-m", "pip", "install")
         if ($PythonUser) {
-            Invoke-Expression "$pythonCmd -m pip install --user -r `"$requirementsFile`""
-        } else {
-            Invoke-Expression "$pythonCmd -m pip install -r `"$requirementsFile`""
+            $arguments += "--user"
         }
+
+        $arguments += @("-r", $requirementsFile)
+        Invoke-Native $pythonCmd.Exe @arguments
     }
 }
 
