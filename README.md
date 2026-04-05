@@ -307,11 +307,26 @@ Alerts have a 5-minute cooldown to prevent spam.
 
 | Workflow | Trigger | Purpose |
 |---|---|---|
-| **Lint** | Push / PR to `main` | Runs Ruff (Python), ESLint (TypeScript), hadolint (Dockerfiles), yamllint (YAML) |
-| **Docker Build & Push** | Push to `main` | Builds and pushes service images to GHCR |
+| **Lint** | Push / PR to `main` | Runs component-aware checks: Ruff (Python), ESLint (TypeScript), hadolint (Dockerfiles), yamllint (YAML) |
+| **Docker Build & Push** | Push / PR to `main`, tags `v*.*.*` | Builds service images; on PRs, only changed services are built |
 | **AI Autolabel Issues** | Issue opened / edited / reopened | Applies `Type:`, `Scope:`, and `Priority:` labels via GitHub Models (GPT-4o-mini) |
 | **Sync Status Labels** | Issue / PR labeled or unlabeled | Keeps `Status:` labels in sync between an issue and its connected PRs (issue → PR, one-way) |
 | **Mirror Issue Labels to PRs** | PR opened / edited / synchronize; issue labeled / unlabeled | Copies all labels from a linked issue to its connected PRs (one-way, add-only). |
+
+### CI path-based triggering
+
+To reduce CI time and avoid unnecessary jobs, pull request checks are scoped by changed paths.
+
+- Documentation-only changes (`docs/**` or `**/*.md`) run only lightweight "docs-only" marker jobs and skip code/build jobs.
+- Lint workflow mapping:
+   - Python lint runs when `analytics/**`, `status-panel/**`, related Python requirements files, or `pyproject.toml` change.
+   - TypeScript lint runs when `status-dashboard/**` or its config/lock files change.
+   - Dockerfile lint runs when any `Dockerfile` or `docker-compose.yml` changes.
+   - YAML lint runs when any `*.yml` or `*.yaml` changes.
+- Docker Build & Push workflow mapping (PRs):
+   - Builds only the services whose directories changed: `icecast/**`, `liquidsoap/**`, `nginx/**`, `status-panel/**`, `analytics/**`.
+   - Builds all services when `docker-compose.yml` changes.
+- Pushes to `main` and release tags keep full coverage (no PR path filtering) for safety.
 
 ### Mirror Issue Labels — maintenance notes
 

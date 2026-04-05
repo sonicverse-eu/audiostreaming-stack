@@ -12,9 +12,80 @@ env:
   IMAGE_BASE: ghcr.io/sonicverse-eu/audiostreaming-stack
 
 jobs:
+  changes:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.docs_only.outputs.value }}
+      affects_all: ${{ steps.filter.outputs.affects_all }}
+      icecast: ${{ steps.filter.outputs.icecast }}
+      liquidsoap: ${{ steps.filter.outputs.liquidsoap }}
+      nginx: ${{ steps.filter.outputs.nginx }}
+      status_panel: ${{ steps.filter.outputs.status_panel }}
+      analytics: ${{ steps.filter.outputs.analytics }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect path changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            docs:
+              - 'docs/**'
+              - '**/*.md'
+            affects_all:
+              - 'docker-compose.yml'
+            icecast:
+              - 'icecast/**'
+            liquidsoap:
+              - 'liquidsoap/**'
+            nginx:
+              - 'nginx/**'
+            status_panel:
+              - 'status-panel/**'
+            analytics:
+              - 'analytics/**'
+
+      - name: Compute docs-only change flag
+        id: docs_only
+        run: |
+          docs_only=false
+          if [[ "${{ steps.filter.outputs.docs }}" == 'true' && \
+                "${{ steps.filter.outputs.affects_all }}" == 'false' && \
+                "${{ steps.filter.outputs.icecast }}" == 'false' && \
+                "${{ steps.filter.outputs.liquidsoap }}" == 'false' && \
+                "${{ steps.filter.outputs.nginx }}" == 'false' && \
+                "${{ steps.filter.outputs.status_panel }}" == 'false' && \
+                "${{ steps.filter.outputs.analytics }}" == 'false' ]]; then
+            docs_only=true
+          fi
+          echo "value=$docs_only" >> "$GITHUB_OUTPUT"
+
+      - name: Summarize detected services
+        run: |
+          echo "docs_only=${{ steps.docs_only.outputs.value }}"
+          echo "affects_all=${{ steps.filter.outputs.affects_all }}"
+          echo "icecast=${{ steps.filter.outputs.icecast }}"
+          echo "liquidsoap=${{ steps.filter.outputs.liquidsoap }}"
+          echo "nginx=${{ steps.filter.outputs.nginx }}"
+          echo "status_panel=${{ steps.filter.outputs.status_panel }}"
+          echo "analytics=${{ steps.filter.outputs.analytics }}"
+
   build:
     name: Build ${{ matrix.service.name }}
     runs-on: ubuntu-latest
+    needs: changes
+    if: >-
+      github.event_name != 'pull_request' ||
+      needs.changes.outputs.affects_all == 'true' ||
+      (matrix.service.name == 'icecast' && needs.changes.outputs.icecast == 'true') ||
+      (matrix.service.name == 'liquidsoap' && needs.changes.outputs.liquidsoap == 'true') ||
+      (matrix.service.name == 'nginx' && needs.changes.outputs.nginx == 'true') ||
+      (matrix.service.name == 'status-panel' && needs.changes.outputs.status_panel == 'true') ||
+      (matrix.service.name == 'analytics' && needs.changes.outputs.analytics == 'true')
     permissions:
       contents: read
       packages: write
@@ -80,3 +151,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.service.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
+
+  docs-only:
+    name: Docs-only PR optimization
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.docs_only == 'true'
+    steps:
+      - run: echo "Documentation-only PR detected. Skipping Docker build matrix."
