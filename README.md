@@ -7,6 +7,14 @@
 
 Self-hosted Docker Compose stack for live radio streaming. Ingest from any studio encoder, deliver via Icecast2 and HLS adaptive bitrate, with automatic fallback, silence detection, PostHog analytics, Pushover alerts, and a real-time operator dashboard.
 
+## Documentation
+
+For setup, operations, and troubleshooting, use the official Sonicverse docs as the single source of truth:
+
+**https://docs.sonicverse.eu**
+
+This repository README is a quick project overview. If local instructions differ from the external docs, follow docs.sonicverse.eu.
+
 Join the Sonicverse OSS Slack for community support, implementation questions, and contributor collaboration.
 
 ## Architecture

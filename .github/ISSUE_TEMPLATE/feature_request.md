@@ -10,6 +10,8 @@ assignees: []
 
 <!-- What are you trying to do that you currently cannot? -->
 
+Reference the related docs page when possible: https://docs.sonicverse.eu
+
 ## Proposed solution
 
 <!-- Describe the feature. -->

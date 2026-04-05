@@ -10,6 +10,8 @@ assignees: []
 
 <!-- A clear description of what is wrong. -->
 
+Reference the relevant docs page when possible: https://docs.sonicverse.eu
+
 ## Steps to reproduce
 
 1.

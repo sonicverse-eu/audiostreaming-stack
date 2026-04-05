@@ -1,5 +1,7 @@
 # Security Policy
 
+Primary project documentation is maintained at **https://docs.sonicverse.eu**. This file covers only security reporting expectations for this repository.
+
 ## Supported Versions
 
 | Version | Supported |

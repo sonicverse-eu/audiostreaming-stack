@@ -2,6 +2,9 @@
 
 This repository accepts AI-assisted changes, but agents should follow the same standards as human contributors in [CONTRIBUTING.md](CONTRIBUTING.md).
 
+Primary project documentation is maintained at **https://docs.sonicverse.eu** and should be treated as the source of truth for setup and operations.
+MCP documentation: **https://docs.sonicverse.eu/mcp**
+
 ## Scope
 
 - Keep changes focused on one bug fix, feature, or cleanup.

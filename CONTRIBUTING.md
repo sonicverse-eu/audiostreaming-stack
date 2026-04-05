@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing. This document covers how to get started, submit changes, and report issues.
 
+Primary documentation lives at **https://docs.sonicverse.eu**. Use it as the canonical source for setup and operational guidance.
+
 If you are using an AI coding agent, also follow [AGENTS.md](AGENTS.md).
 
 ## Getting Started
