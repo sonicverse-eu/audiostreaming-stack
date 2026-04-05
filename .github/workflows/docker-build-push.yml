@@ -52,6 +52,7 @@ jobs:
       - name: Compute docs-only change flag
         id: docs_only
         run: |
+          set -e
           docs_only=false
           if [[ "${{ steps.filter.outputs.docs }}" == 'true' && \
                 "${{ steps.filter.outputs.affects_all }}" == 'false' && \
@@ -60,7 +61,7 @@ jobs:
                 "${{ steps.filter.outputs.nginx }}" == 'false' && \
                 "${{ steps.filter.outputs.status_panel }}" == 'false' && \
                 "${{ steps.filter.outputs.analytics }}" == 'false' ]]; then
-            docs_only=true
+                docs_only=true
           fi
           echo "value=$docs_only" >> "$GITHUB_OUTPUT"
 
