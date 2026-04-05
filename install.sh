@@ -25,6 +25,17 @@ print_banner() {
     echo -e "${NC}"
 }
 
+print_mode_info() {
+    local mode="$1"
+    if [ "$mode" = "dev" ]; then
+        echo -e "  ${BLUE}ℹ${NC}  Development mode enabled — installing Node/Python dependencies"
+    else
+        echo -e "  ${BLUE}ℹ${NC}  Deployment mode (minimal) — skipping dev dependencies"
+        echo -e "  ${BLUE}ℹ${NC}  To install dev deps, run: ./install.sh --dev"
+    fi
+    echo ""
+}
+
 info()    { echo -e "  ${BLUE}ℹ${NC}  $1"; }
 success() { echo -e "  ${GREEN}✓${NC}  $1"; }
 warn()    { echo -e "  ${YELLOW}!${NC}  $1"; }
@@ -54,19 +65,67 @@ generate_password() {
     cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | head -c 20
 }
 
+usage() {
+    cat <<'EOF'
+Sonicverse Radio Streaming Stack Installer
+
+Usage:
+  ./install.sh [OPTIONS]
+
+Options:
+  --dev              Install Node/Python dependencies for local development.
+                     Required for: building dashboard, running analytics/API locally.
+                     Skip this if using GHCR pre-built images (recommended for deployment).
+  --use-prebuilt     Pull images from GHCR instead of building locally (faster).
+                     Use this if you don't plan to modify container code.
+  -h, --help         Show this help message.
+
+Deployment scenarios:
+  Minimal deployment with GHCR images (easiest):
+    $ ./install.sh --use-prebuilt
+
+  Full development environment:
+    $ ./install.sh --dev
+
+  Build containers locally (advanced):
+    $ ./install.sh
+
+EOF
+}
+
 TOTAL_STEPS=6
 
 # Parse flags
 USE_PREBUILT=false
+DEV_MODE=false
 for arg in "$@"; do
     case "$arg" in
         --use-prebuilt) USE_PREBUILT=true ;;
+        --dev) DEV_MODE=true ;;
+        -h|--help) usage; exit 0 ;;
+        *)
+            echo "Error: Unknown option '$arg'" >&2
+            echo "Use --help for usage information." >&2
+            exit 1
+            ;;
     esac
 done
+
+# Adjust total steps based on whether we're installing dev dependencies
+TOTAL_STEPS=6
+if [ "$DEV_MODE" = "true" ]; then
+    TOTAL_STEPS=7
+fi
 
 # ============================================================
 
 print_banner
+
+if [ "$DEV_MODE" = "true" ]; then
+    print_mode_info "dev"
+else
+    print_mode_info "deploy"
+fi
 
 # ----------------------------------------------------------
 # Detect existing installation
@@ -315,9 +374,31 @@ ENVFILE
 fi
 
 # ----------------------------------------------------------
-# Step 3: Emergency fallback audio
+# Step 3: Install development dependencies (optional)
 # ----------------------------------------------------------
-step 3 "Emergency fallback audio"
+if [ "$DEV_MODE" = "true" ]; then
+    step 3 "Installing development dependencies"
+    echo ""
+    info "Installing Node.js and Python dependencies..."
+    echo ""
+    if [ -f "install-all.sh" ]; then
+        bash ./install-all.sh
+        success "Development dependencies installed"
+    else
+        error "install-all.sh not found"
+        exit 1
+    fi
+    STEP_OFFSET=1
+else
+    info "Skipping development dependencies (use --dev to install)"
+    STEP_OFFSET=0
+fi
+
+# ----------------------------------------------------------
+# Step $((4-STEP_OFFSET)): Emergency fallback audio
+# ----------------------------------------------------------
+STEP_NUM=$((4 - STEP_OFFSET))
+step $STEP_NUM "Emergency fallback audio"
 
 if ls emergency-audio/*.mp3 emergency-audio/*.flac emergency-audio/*.wav 2>/dev/null | head -1 &>/dev/null; then
     success "Fallback audio found in emergency-audio/"
@@ -334,9 +415,10 @@ else
 fi
 
 # ----------------------------------------------------------
-# Step 4: Build containers
+# Step $((5-STEP_OFFSET)): Build containers
 # ----------------------------------------------------------
-step 4 "Building containers"
+STEP_NUM=$((5 - STEP_OFFSET))
+step $STEP_NUM "Building containers"
 
 if [ "$USE_PREBUILT" = "true" ]; then
     info "Pulling pre-built images from GHCR..."
@@ -353,9 +435,10 @@ else
 fi
 
 # ----------------------------------------------------------
-# Step 5: SSL certificate
+# Step $((6-STEP_OFFSET)): SSL certificate
 # ----------------------------------------------------------
-step 5 "SSL certificate"
+STEP_NUM=$((6 - STEP_OFFSET))
+step $STEP_NUM "SSL certificate"
 
 # Source .env for hostname
 source .env 2>/dev/null || true
@@ -392,9 +475,10 @@ else
 fi
 
 # ----------------------------------------------------------
-# Step 6: Launch
+# Step $((7-STEP_OFFSET)): Launch
 # ----------------------------------------------------------
-step 6 "Launch"
+STEP_NUM=$((7 - STEP_OFFSET))
+step $STEP_NUM "Launch"
 
 echo ""
 read -rp "  → Start the streaming stack now? (Y/n): " start_now
