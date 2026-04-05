@@ -1,13 +1,17 @@
-# Breeze Radio — Audio Streaming Stack
+# Sonicverse — Radio Audio Streaming Stack
 
-Docker Compose stack for live radio streaming using Liquidsoap and Icecast2.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/sonicverse-eu/audiostreaming-stack/actions/workflows/lint.yml/badge.svg)](https://github.com/sonicverse-eu/audiostreaming-stack/actions/workflows/lint.yml)
+[![GHCR](https://img.shields.io/badge/Images-GHCR-blue?logo=github)](https://github.com/sonicverse-eu/audiostreaming-stack/pkgs/container/audiostreaming-stack%2Ficecast)
+
+Self-hosted Docker Compose stack for live radio streaming. Ingest from any studio encoder, deliver via Icecast2 and HLS adaptive bitrate, with automatic fallback, silence detection, PostHog analytics, Pushover alerts, and a real-time operator dashboard.
 
 ## Architecture
 
 ```
 Studio (BUTT/etc)
-  ├── FLAC stream ──► :8010 ─┐
-  └── Ogg stream  ──► :8011 ─┤
+   ├── MP3 320k stream ──► :8010 ─┐
+   └── MP3 192k stream ──► :8011 ─┤
                               ▼
                       ┌─────────────┐
                       │  Liquidsoap  │──► HLS segments
@@ -16,11 +20,11 @@ Studio (BUTT/etc)
                       └──────┬───────┘
                              │
                       ┌──────▼───────┐
-                      │   Icecast2   │  4 mount points
+                      │   Icecast2   │  6 mount points
                       └──────┬───────┘
                              │
                       ┌──────▼───────┐
-                      │    Nginx     │  :80 (public)
+                      │    Nginx     │  :80 / :443
                       │  HLS + proxy │
                       └──────────────┘
 ```
@@ -30,16 +34,18 @@ Studio (BUTT/etc)
 | Service | Description |
 |---|---|
 | **Icecast2** | Stream distribution server with multiple mount points |
-| **Liquidsoap** | Stream processor — ingest, fallback chain, encoding |
+| **Liquidsoap** | Stream processor — ingest, fallback chain, encoding, HLS |
 | **Nginx** | Public-facing reverse proxy + HLS segment serving |
-| **Analytics** | Polls Icecast stats and sends events to PostHog |
+| **Status Panel** | Flask API backend — stream health, container status, emergency audio management |
+| **Analytics** | Polls Icecast stats and sends events to PostHog + Pushover alerts |
+| **Certbot** | Automatic Let's Encrypt certificate renewal |
 
 ## Stream Inputs (Studio → Liquidsoap)
 
 | Input | Port | Protocol | Format |
 |---|---|---|---|
-| Primary | 8010 | Icecast source | FLAC (lossless) |
-| Fallback | 8011 | Icecast source | Ogg Vorbis |
+| Primary | 8010 | Icecast source | MP3 CBR 320 kbps |
+| Fallback | 8011 | Icecast source | MP3 CBR 192 kbps |
 | Emergency | — | Local file | `emergency-audio/fallback.mp3` |
 
 Fallback chain: Primary → Fallback → Emergency file (automatic, no manual intervention needed).
@@ -50,7 +56,12 @@ Fallback chain: Primary → Fallback → Emergency file (automatic, no manual in
 
 | Mount | Format | Bitrate | URL |
 |---|---|---|---|
- 
+| `/stream-mp3-128` | MP3 | 128 kbps | `https://<host>/listen/stream-mp3-128` |
+| `/stream-mp3-192` | MP3 | 192 kbps | `https://<host>/listen/stream-mp3-192` |
+| `/stream-mp3-320` | MP3 | 320 kbps | `https://<host>/listen/stream-mp3-320` |
+| `/stream-aac-128` | AAC | 128 kbps | `https://<host>/listen/stream-aac-128` |
+| `/stream-aac-192` | AAC | 192 kbps | `https://<host>/listen/stream-aac-192` |
+| `/stream-ogg-128` | Ogg Vorbis | 128 kbps | `https://<host>/listen/stream-ogg-128` |
 
 ### HLS (for mobile)
 
@@ -58,91 +69,22 @@ Fallback chain: Primary → Fallback → Emergency file (automatic, no manual in
 https://<host>/hls/live.m3u8
 ```
 
-Adaptive bitrate with 4 AAC quality tiers (48k, 96k, 128k, 256k) — players automatically select the best quality for the connection.
-
-## Prerequisites
-
-### Install Docker
-
-**Ubuntu/Debian:**
-```bash
-# Install Docker Engine
-curl -fsSL https://get.docker.com | sh
-
-# Add your user to the docker group (log out and back in after)
-sudo usermod -aG docker $USER
-
-# Verify installation
-docker --version
-docker compose version
-```
-
-**macOS:**
-```bash
-# Install Docker Desktop via Homebrew
-brew install --cask docker
-
-# Or download from https://www.docker.com/products/docker-desktop/
-```
-
-**Windows:**
-
-Download and install [Docker Desktop](https://www.docker.com/products/docker-desktop/) — requires WSL 2.
-
-### Firewall
-
-Open the following ports on your server:
-
-| Port | Protocol | Purpose |
-|---|---|---|
-| 80 | TCP | HTTP (Let's Encrypt ACME + redirect to HTTPS) |
-| 443 | TCP | HTTPS (listener streams + HLS + admin) |
-| 8010 | TCP | Studio primary input (FLAC) |
-| 8011 | TCP | Studio fallback input (Ogg) |
-
-**Ubuntu/Debian (ufw):**
-```bash
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw allow 8010/tcp
-sudo ufw allow 8011/tcp
-sudo ufw reload
-```
-
-**CentOS/RHEL (firewalld):**
-```bash
-sudo firewall-cmd --permanent --add-port=80/tcp
-sudo firewall-cmd --permanent --add-port=443/tcp
-sudo firewall-cmd --permanent --add-port=8010/tcp
-sudo firewall-cmd --permanent --add-port=8011/tcp
-sudo firewall-cmd --reload
-```
-
-**iptables:**
-```bash
-sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 8010 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 8011 -j ACCEPT
-```
-
-**Automated setup (UFW):**
-```bash
-# Open all required ports (unrestricted)
-sudo ./setup-firewall.sh
-
-# Recommended: restrict studio ports to your studio's IP
-sudo ./setup-firewall.sh --studio-ip 203.0.113.50
-```
-
-The script ensures SSH access is preserved, opens the required ports, and optionally restricts studio source ports to a specific IP.
+Adaptive bitrate with 3 AAC quality tiers — players automatically select the best quality for the connection.
 
 ## Quick Start
 
-### One-line install
+### Option A — Pull pre-built images from GHCR (fastest)
 
 ```bash
-git clone https://github.com/rikvisser-dev/audiostreaming-stack.git
+git clone https://github.com/sonicverse-eu/audiostreaming-stack.git
+cd audiostreaming-stack
+./install.sh --use-prebuilt
+```
+
+### Option B — Build locally
+
+```bash
+git clone https://github.com/sonicverse-eu/audiostreaming-stack.git
 cd audiostreaming-stack
 ./install.sh
 ```
@@ -153,21 +95,19 @@ The installer walks you through Docker checks, configuration, SSL setup, and lau
 
 1. **Clone and configure**
    ```bash
-   git clone https://github.com/rikvisser-dev/audiostreaming-stack.git
+   git clone https://github.com/sonicverse-eu/audiostreaming-stack.git
    cd audiostreaming-stack
    cp .env.example .env
-   # Edit .env with your passwords and PostHog API key
+   # Edit .env with your values
    ```
 
 2. **Add emergency audio**
    ```bash
-   # Place a fallback audio file (loops when both live sources are down)
    cp /path/to/your/fallback.mp3 emergency-audio/fallback.mp3
    ```
 
 3. **Obtain SSL certificate**
    ```bash
-   # First run only — obtains Let's Encrypt certificate
    ./init-letsencrypt.sh
    ```
 
@@ -179,47 +119,80 @@ The installer walks you through Docker checks, configuration, SSL setup, and lau
 5. **Connect your studio encoder**
 
    Configure BUTT (or similar) to send:
-   - **Primary stream**: Host `<server-ip>`, Port `8010`, Mount `/primary`, Password from `.env`
-   - **Fallback stream**: Host `<server-ip>`, Port `8011`, Mount `/secondary`, Password from `.env`
+   - **Primary stream**: Host `<server-ip>`, Port `8010`, Mount `/primary`, Password from `.env`, MIME `audio/mpeg`, bitrate `320 kbps`
+   - **Fallback stream**: Host `<server-ip>`, Port `8011`, Mount `/secondary`, Password from `.env`, MIME `audio/mpeg`, bitrate `192 kbps`
+
+   **Command-line encoder profile (LAME):**
+   - Primary: `lame.exe -r -s 44.1 -b 320 -x - -`
+   - Fallback: `lame.exe -r -s 44.1 -b 192 -x - -`
 
 6. **Verify**
    - Icecast admin: `http://<host>/icecast-admin/`
    - Test stream: `http://<host>/listen/stream-mp3-128` in VLC
    - HLS: `http://<host>/hls/live.m3u8` in Safari/VLC
 
+## Prerequisites
+
+### Docker
+
+**Ubuntu/Debian:**
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+```
+
+**macOS / Windows:** Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows requires WSL 2).
+
+### Firewall
+
+| Port | Purpose |
+|---|---|
+| 80 | HTTP (Let's Encrypt ACME + redirect) |
+| 443 | HTTPS (streams + HLS + admin) |
+| 8010 | Studio primary input |
+| 8011 | Studio fallback input |
+
+**Automated UFW setup:**
+```bash
+sudo ./setup-firewall.sh
+
+# Restrict studio ports to a specific IP (recommended):
+sudo ./setup-firewall.sh --studio-ip 203.0.113.50
+```
+
 ## Configuration
 
-All secrets and settings are managed via `.env`:
+All settings are managed via `.env` (copy from `.env.example`):
 
 | Variable | Description |
 |---|---|
-| `STATION_NAME` | Radio station name (used in stream metadata and alerts) |
+| `STATION_NAME` | Station name (used in stream metadata and alerts) |
 | `STATION_LOCATION` | Station location (Icecast server info) |
-| `STATION_ADMIN_EMAIL` | Admin contact email (Icecast server info) |
+| `STATION_ADMIN_EMAIL` | Admin contact email |
 | `ICECAST_SOURCE_PASSWORD` | Password for Liquidsoap → Icecast connections |
 | `ICECAST_ADMIN_PASSWORD` | Icecast admin panel password |
 | `HARBOR_PASSWORD` | Password for studio → Liquidsoap connections |
-| `ICECAST_HOSTNAME` | Public hostname for Icecast |
+| `ICECAST_HOSTNAME` | Public hostname |
 | `ICECAST_MAX_LISTENERS` | Maximum concurrent listeners |
 | `LETSENCRYPT_EMAIL` | Email for Let's Encrypt notifications |
 | `LETSENCRYPT_STAGING` | Set to `1` for test certificates |
 | `PUSHOVER_USER_KEY` | Pushover user key for silence/failover alerts |
 | `PUSHOVER_APP_TOKEN` | Pushover application token |
-| `SILENCE_THRESHOLD_DB` | Silence detection threshold in dB (default: -40) |
-| `SILENCE_DURATION` | Seconds of silence before alerting (default: 15) |
+| `SILENCE_THRESHOLD_DB` | Silence detection threshold in dB (default: `-40`) |
+| `SILENCE_DURATION` | Seconds of silence before alerting (default: `15`) |
 | `APPWRITE_ENDPOINT` | Appwrite API endpoint |
 | `APPWRITE_PROJECT_ID` | Appwrite project ID |
 | `APPWRITE_TEAM_ID` | Appwrite team ID (only members get panel access) |
-| `STATUS_PANEL_CORS_ORIGIN` | Frontend URL(s) for CORS, comma-separated (e.g. `https://broadcast-status.breezeradio.nl,https://status.breezeradio.nl`) |
+| `STATUS_PANEL_CORS_ORIGIN` | Status dashboard URL(s) for CORS, comma-separated (e.g. `https://status.example.com`) |
 | `STATUS_PANEL_WRITE_ROLES` | Appwrite team roles allowed to manage emergency audio (default: `owner,admin`) |
-| `STATUS_PANEL_ALLOW_RISKY_COMMANDS` | Enable destructive remote commands like restart/renew SSL (`0` by default) |
+| `STATUS_PANEL_ALLOW_RISKY_COMMANDS` | Enable remote restart/SSL renewal commands (`0` by default) |
 | `POSTHOG_API_KEY` | PostHog project API key |
 | `POSTHOG_HOST` | PostHog instance URL |
-| `POSTHOG_POLL_INTERVAL` | Stats polling interval in seconds (default: 30) |
+| `POSTHOG_POLL_INTERVAL` | Stats polling interval in seconds (default: `30`) |
 
 ## Status Panel
 
-Real-time broadcast engineer dashboard with Appwrite authentication. Only members of the configured Appwrite team can access the panel.
+Real-time broadcast engineer dashboard with Appwrite team-based authentication.
 
 **Features:**
 - Live listener counts and mount point status (5s refresh)
@@ -227,22 +200,15 @@ Real-time broadcast engineer dashboard with Appwrite authentication. Only member
 - Stack configuration overview
 - Recent alerts timeline
 - Emergency audio upload/management
-- Useful CLI commands (click to copy)
-- Databases & storage overview
+- Role-based write access
 
 ### Deployment on Appwrite Sites
 
-The dashboard is a Next.js app (`status-dashboard/`) deployed separately on Appwrite Sites:
-
-1. `cd status-dashboard && cp .env.local.example .env.local`
-2. Edit `.env.local` with your streaming server URL and Appwrite credentials
-3. `npm install && npm run build` — outputs static export to `out/`
-4. Deploy `out/` to Appwrite Sites via CLI or Git integration
-
 ```bash
 cd status-dashboard
-npm install
-npm run build
+cp .env.local.example .env.local
+# Edit .env.local with your streaming server URL and Appwrite credentials
+npm install && npm run build
 # Deploy the out/ directory to Appwrite Sites
 ```
 
@@ -250,7 +216,7 @@ The API backend runs in the Docker stack and is proxied through nginx at `/api/`
 
 ## Analytics & Alerts
 
-The analytics sidecar sends the following events to PostHog:
+The analytics service sends the following events to PostHog:
 
 - `stream_listeners` — per-mount listener count (every poll)
 - `stream_total_listeners` — aggregate listener count
@@ -259,17 +225,15 @@ The analytics sidecar sends the following events to PostHog:
 
 ### Pushover Alerts
 
-Liquidsoap monitors the audio stream for silence and triggers Pushover notifications:
-
 | Alert | Priority | Trigger |
 |---|---|---|
-| Silence detected | High (siren) | Audio below -40 dB for 15 seconds |
+| Silence detected | High (siren) | Audio below threshold for configured duration |
 | Audio resumed | Low | Audio returns after silence |
-| Stream outage | High (siren) | One combined alert when one or more Icecast outputs disconnect |
+| Stream outage | High (siren) | One or more Icecast outputs disconnect |
 | Primary harbor down | High (siren) | Primary studio input disconnects |
-| Secondary harbor down | High / Critical | Secondary studio input disconnects; escalates to critical when primary is already down |
+| Secondary harbor down | High / Critical | Secondary disconnects; escalates when primary is also down |
 
-Alerts have a 5-minute cooldown to prevent spam. Configure thresholds via `SILENCE_THRESHOLD_DB` and `SILENCE_DURATION` in `.env`.
+Alerts have a 5-minute cooldown to prevent spam.
 
 ## File Structure
 
@@ -278,6 +242,7 @@ Alerts have a 5-minute cooldown to prevent spam. Configure thresholds via `SILEN
 ├── .env.example
 ├── install.sh
 ├── init-letsencrypt.sh
+├── setup-firewall.sh
 ├── icecast/
 │   ├── Dockerfile
 │   └── icecast.xml
@@ -300,7 +265,18 @@ Alerts have a 5-minute cooldown to prevent spam. Configure thresholds via `SILEN
 │   ├── components/
 │   ├── lib/
 │   └── package.json
-├── setup-firewall.sh
 └── emergency-audio/
     └── fallback.mp3
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Security
+
+See [SECURITY.md](SECURITY.md). Do not open public issues for security vulnerabilities.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

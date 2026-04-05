@@ -1,10 +1,9 @@
-FROM python:3.15-rc-alpine3.22
+FROM python:3.12-alpine
 
 WORKDIR /app
 
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends docker.io \
-	&& rm -rf /var/lib/apt/lists/*
+# hadolint ignore=DL3018
+RUN apk add --no-cache docker-cli
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

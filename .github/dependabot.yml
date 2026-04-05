@@ -1,0 +1,51 @@
+version: 2
+updates:
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Docker base images
+  - package-ecosystem: "docker"
+    directory: "/icecast"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker"
+    directory: "/liquidsoap"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker"
+    directory: "/nginx"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker"
+    directory: "/status-panel"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker"
+    directory: "/analytics"
+    schedule:
+      interval: "weekly"
+
+  # npm (status-dashboard)
+  - package-ecosystem: "npm"
+    directory: "/status-dashboard"
+    schedule:
+      interval: "weekly"
+
+  # pip (status-panel)
+  - package-ecosystem: "pip"
+    directory: "/status-panel"
+    schedule:
+      interval: "weekly"
+
+  # pip (analytics)
+  - package-ecosystem: "pip"
+    directory: "/analytics"
+    schedule:
+      interval: "weekly"

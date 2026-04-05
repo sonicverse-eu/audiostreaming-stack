@@ -1,17 +1,16 @@
 """
-Breeze Radio — Icecast Listener Analytics → PostHog + Pushover Alerts
+Sonicverse — Icecast Listener Analytics → PostHog + Pushover Alerts
 
 Polls Icecast stats endpoint and sends listener metrics to PostHog.
 Receives silence detection webhooks from Liquidsoap and sends Pushover alerts.
 """
 
-import json
 import os
 import sys
-import time
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
 
 import requests
 
@@ -20,9 +19,9 @@ ICECAST_URL = os.getenv("ICECAST_URL", "http://icecast:8000")
 ICECAST_ADMIN_USER = os.getenv("ICECAST_ADMIN_USER", "admin")
 ICECAST_ADMIN_PASSWORD = os.getenv("ICECAST_ADMIN_PASSWORD", "changeme")
 POSTHOG_API_KEY = os.getenv("POSTHOG_API_KEY", "")
-POSTHOG_HOST = os.getenv("POSTHOG_HOST", "https://posthog.sonicverse.eu")
+POSTHOG_HOST = os.getenv("POSTHOG_HOST", "https://app.posthog.com")
 POLL_INTERVAL = int(os.getenv("POSTHOG_POLL_INTERVAL", "30"))
-DISTINCT_ID = "breezeradio-streaming-stack"
+DISTINCT_ID = "sonicverse-streaming-stack"
 
 # Station
 STATION_NAME = os.getenv("STATION_NAME", "Radio Station")
@@ -45,13 +44,15 @@ harbor_states = {
     "secondary": True,
 }
 
-# Initialize PostHog (only if a real key is provided)
+# Initialize PostHog only when a non-empty, non-placeholder key is explicitly provided.
+# A key is considered a placeholder if it is empty or matches obvious example values.
+_POSTHOG_PLACEHOLDERS = {"phc_xxx", "phc_example", "changeme"}
 posthog_client = None
-if POSTHOG_API_KEY and POSTHOG_API_KEY.startswith("phc_"):
+if POSTHOG_API_KEY and POSTHOG_API_KEY not in _POSTHOG_PLACEHOLDERS:
     from posthog import Posthog
     posthog_client = Posthog(project_api_key=POSTHOG_API_KEY, host=POSTHOG_HOST)
 else:
-    POSTHOG_API_KEY = ""  # treat invalid keys as unconfigured
+    POSTHOG_API_KEY = ""  # treat unset/placeholder keys as unconfigured
 
 # Track previous state for failover detection
 previous_sources = {}
@@ -370,7 +371,7 @@ def polling_loop():
 # ============================================================
 
 def main():
-    print("[analytics] Starting Breeze Radio analytics + alerts service")
+    print("[analytics] Starting Sonicverse analytics + alerts service")
 
     if not POSTHOG_API_KEY and not PUSHOVER_USER_KEY:
         print("[analytics] Neither POSTHOG_API_KEY nor PUSHOVER_USER_KEY set.", file=sys.stderr)

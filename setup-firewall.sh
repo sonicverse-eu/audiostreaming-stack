@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================
-# Breeze Radio — UFW Firewall Setup
+# Sonicverse — UFW Firewall Setup
 # ============================================================
 # Configures UFW rules for the streaming stack.
 # Run with sudo: sudo ./setup-firewall.sh

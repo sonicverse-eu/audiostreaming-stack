@@ -1,5 +1,5 @@
 """
-Broadcast Engineer Status Panel — API backend
+Sonicverse Status Panel — API backend
 
 Serves a real-time dashboard showing stream health, listener counts,
 source status, alert history, configuration, and container status.
@@ -7,39 +7,26 @@ Protected by Appwrite authentication.
 """
 
 import functools
+import glob as globmod
 import json
 import os
+import shutil
 import subprocess
 import time
 from collections import deque
 
-import glob as globmod
-import shutil
-
 import requests
-from flask import Flask, jsonify, request, Response, g
+from flask import Flask, Response, g, jsonify, request
 from flask_cors import CORS
 from werkzeug.exceptions import RequestEntityTooLarge
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024 * 1024  # 1 GiB upload limit
 
-# CORS — allow the current and legacy Breeze Radio panel origins.
-DEFAULT_CORS_ORIGINS = {
-    "https://status.breezeradio.nl",
-    "https://broadcast-status.breezeradio.nl",
-}
-
-
+# CORS — set STATUS_PANEL_CORS_ORIGIN in your .env to your status dashboard URL(s), comma-separated.
 def get_cors_origins():
     raw_origins = os.getenv("STATUS_PANEL_CORS_ORIGIN", "")
     origins = {origin.strip() for origin in raw_origins.split(",") if origin.strip()}
-
-    if not origins:
-        origins = set(DEFAULT_CORS_ORIGINS)
-    elif "https://status.breezeradio.nl" in origins or "https://broadcast-status.breezeradio.nl" in origins:
-        origins |= DEFAULT_CORS_ORIGINS
-
     return sorted(origins)
 
 
@@ -372,7 +359,7 @@ def api_containers():
     """Get Docker container status for all stack services."""
     try:
         result = subprocess.run(
-            ["docker", "ps", "-a", "--filter", "name=breezeradio-", "--format",
+            ["docker", "ps", "-a", "--filter", "name=sonicverse-", "--format",
              '{"name":"{{.Names}}","status":"{{.Status}}","image":"{{.Image}}","ports":"{{.Ports}}"}'],
             capture_output=True, text=True, timeout=5,
         )
@@ -502,7 +489,7 @@ ALLOWED_SERVICES = {"icecast", "liquidsoap", "nginx", "analytics", "status-panel
 READONLY_COMMANDS = {
     "logs": {
         "label": "View recent logs",
-        "build": lambda svc: ["docker", "logs", "--tail", "80", f"breezeradio-{svc}"],
+        "build": lambda svc: ["docker", "logs", "--tail", "80", f"sonicverse-{svc}"],
         "requires_service": True,
     },
     "disk_usage": {
@@ -521,7 +508,7 @@ READONLY_COMMANDS = {
 RISKY_COMMANDS = {
     "restart_service": {
         "label": "Restart a service",
-        "build": lambda svc: ["docker", "restart", f"breezeradio-{svc}"],
+        "build": lambda svc: ["docker", "restart", f"sonicverse-{svc}"],
         "requires_service": True,
     },
     "restart_stack": {

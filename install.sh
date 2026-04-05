@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================
-# Breeze Radio — Audio Streaming Stack Installer
+# Sonicverse — Radio Audio Streaming Stack Installer
 # ============================================================
 
 set -e
@@ -18,10 +18,10 @@ NC='\033[0m'
 print_banner() {
     echo ""
     echo -e "${CYAN}${BOLD}"
-    echo "  ╔══════════════════════════════════════════╗"
-    echo "  ║   Breeze Radio — Streaming Stack Setup   ║"
-    echo "  ║   Liquidsoap + Icecast2 + HLS + PostHog  ║"
-    echo "  ╚══════════════════════════════════════════╝"
+    echo "  ╔════════════════════════════════════════════════╗"
+    echo "  ║   Sonicverse — Radio Audio Streaming Stack     ║"
+    echo "  ║   Liquidsoap + Icecast2 + HLS + PostHog        ║"
+    echo "  ╚════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
 
@@ -55,6 +55,14 @@ generate_password() {
 }
 
 TOTAL_STEPS=6
+
+# Parse flags
+USE_PREBUILT=false
+for arg in "$@"; do
+    case "$arg" in
+        --use-prebuilt) USE_PREBUILT=true ;;
+    esac
+done
 
 # ============================================================
 
@@ -204,13 +212,13 @@ if [ "${SKIP_ENV}" != "true" ]; then
     echo ""
 
     # Station identity
-    prompt STATION_NAME        "Station name" "Breeze Radio"
+    prompt STATION_NAME        "Station name" "My Radio Station"
     prompt STATION_LOCATION    "Station location" "Netherlands"
-    prompt STATION_ADMIN_EMAIL "Station admin email" "admin@breezeradio.nl"
+    prompt STATION_ADMIN_EMAIL "Station admin email" "admin@example.com"
 
     # Hostname
     echo ""
-    prompt ICECAST_HOSTNAME "Public hostname" "stream.breezeradio.nl"
+    prompt ICECAST_HOSTNAME "Public hostname" "stream.example.com"
 
     # Generate secure passwords
     echo ""
@@ -227,7 +235,7 @@ if [ "${SKIP_ENV}" != "true" ]; then
 
     # Let's Encrypt
     echo ""
-    prompt LETSENCRYPT_EMAIL "Let's Encrypt email" "admin@breezeradio.nl"
+    prompt LETSENCRYPT_EMAIL "Let's Encrypt email" "admin@example.com"
     read -rp "  → Use Let's Encrypt staging (test certs)? (y/N): " use_staging
     LETSENCRYPT_STAGING=0
     if [[ "$use_staging" =~ ^[Yy]$ ]]; then
@@ -244,7 +252,7 @@ if [ "${SKIP_ENV}" != "true" ]; then
     prompt APPWRITE_ENDPOINT   "Appwrite endpoint" "https://cloud.appwrite.io/v1"
     prompt APPWRITE_PROJECT_ID "Appwrite project ID" ""
     prompt APPWRITE_TEAM_ID    "Appwrite team ID (members get panel access)" ""
-    prompt STATUS_PANEL_CORS_ORIGIN "Status panel frontend URL(s) for CORS" "https://broadcast-status.breezeradio.nl,https://status.breezeradio.nl"
+    prompt STATUS_PANEL_CORS_ORIGIN "Status panel frontend URL(s) for CORS" "https://status.example.com"
     prompt STATUS_PANEL_WRITE_ROLES "Operator roles for writes (comma-separated)" "owner,admin"
     prompt STATUS_PANEL_ALLOW_RISKY_COMMANDS "Allow destructive panel commands? (0/1)" "0"
 
@@ -330,11 +338,19 @@ fi
 # ----------------------------------------------------------
 step 4 "Building containers"
 
-info "This may take a few minutes on first run..."
-echo ""
-docker compose build
-echo ""
-success "All containers built successfully"
+if [ "$USE_PREBUILT" = "true" ]; then
+    info "Pulling pre-built images from GHCR..."
+    echo ""
+    docker compose pull || { error "Pull failed. Images may not exist yet. Run without --use-prebuilt to build locally."; exit 1; }
+    echo ""
+    success "All images pulled from GHCR"
+else
+    info "This may take a few minutes on first run..."
+    echo ""
+    docker compose build
+    echo ""
+    success "All containers built successfully"
+fi
 
 # ----------------------------------------------------------
 # Step 5: SSL certificate
@@ -396,7 +412,7 @@ fi
 echo ""
 echo -e "${CYAN}${BOLD}"
 echo "  ╔══════════════════════════════════════════╗"
-echo "  ║            Setup Complete!                ║"
+echo "  ║            Setup Complete!               ║"
 echo "  ╚══════════════════════════════════════════╝"
 echo -e "${NC}"
 echo -e "  ${BOLD}Studio connections:${NC}"
