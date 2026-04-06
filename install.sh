@@ -189,15 +189,57 @@ if docker compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
     case "$update_choice" in
         1)
             info "Updating stack..."
+            backup_file="$(mktemp -t sonicverse-image-backup.XXXXXX)"
+            backup_stamp="$(date +%s)"
+            trap 'rm -f "$backup_file"' EXIT
+
+            info "Backing up currently running service images..."
+            backup_count=0
+            for service in $(docker compose config --services 2>/dev/null || true); do
+                container_id="$(docker compose ps -q "$service" 2>/dev/null || true)"
+                if [ -z "$container_id" ]; then
+                    continue
+                fi
+
+                original_image="$(docker inspect --format '{{.Config.Image}}' "$container_id" 2>/dev/null || true)"
+                current_image_id="$(docker inspect --format '{{.Image}}' "$container_id" 2>/dev/null || true)"
+                if [ -z "$original_image" ] || [ -z "$current_image_id" ]; then
+                    continue
+                fi
+
+                backup_image="sonicverse-backup/${service}:${backup_stamp}"
+                if docker tag "$current_image_id" "$backup_image" 2>/dev/null; then
+                    echo "${original_image}|${backup_image}" >> "$backup_file"
+                    backup_count=$((backup_count + 1))
+                fi
+            done
+            success "Backed up $backup_count image(s)."
             echo ""
             info "Pulling latest changes..."
             git pull 2>/dev/null || true
             echo ""
-            info "Rebuilding containers..."
+            info "Pulling latest images (sequential pull)..."
+            docker compose pull --no-parallel || true
+            echo ""
+            info "Rebuilding any local images..."
             docker compose build
             echo ""
-            info "Restarting with new images..."
-            docker compose up -d
+            info "Applying updates with zero downtime..."
+            if ! docker compose up -d --remove-orphans; then
+                error "Failed to update stack. Rolling back..."
+                if [ -s "$backup_file" ]; then
+                    info "Restoring previously running images..."
+                    while IFS='|' read -r original_image backup_image; do
+                        if [ -n "$original_image" ] && [ -n "$backup_image" ] && docker image inspect "$backup_image" >/dev/null 2>&1; then
+                            docker tag "$backup_image" "$original_image" || true
+                        fi
+                    done < "$backup_file"
+                else
+                    warn "No image backups found; retrying with current images."
+                fi
+                docker compose up -d --remove-orphans || true
+                exit 1
+            fi
             echo ""
             success "Stack updated successfully!"
             echo ""
@@ -465,11 +507,11 @@ STEP_NUM=$((STEP_NUM + 1))
 step "$STEP_NUM" "Building containers"
 
 if [ "$USE_PREBUILT" = "true" ]; then
-    info "Pulling pre-built images from Docker Hub..."
+    info "Pulling pre-built images from Docker Hub or configured registry..."
     echo ""
-    docker compose pull || { error "Pull failed. Images may not exist yet. Run with --build-local to build locally instead."; exit 1; }
+    docker compose pull --no-parallel || { error "Pull failed. Images may not exist yet. Run with --build-local to build locally instead."; exit 1; }
     echo ""
-    success "All images pulled from Docker Hub"
+    success "All images pulled successfully"
 else
     info "Building containers locally. This may take a few minutes on first run..."
     echo ""
