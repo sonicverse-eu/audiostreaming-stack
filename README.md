@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/sonicverse-eu/audiostreaming-stack/actions/workflows/lint.yml/badge.svg)](https://github.com/sonicverse-eu/audiostreaming-stack/actions/workflows/lint.yml)
 [![GHCR](https://img.shields.io/badge/Images-GHCR-blue?logo=github)](https://github.com/sonicverse-eu/audiostreaming-stack/pkgs/container/audiostreaming-stack%2Ficecast)
+[![Docker Hub](https://img.shields.io/badge/Images-Docker%20Hub-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/u/sonicverse)
 [![Join Sonicverse OSS Slack](https://img.shields.io/badge/Join-Sonicverse%20OSS%20Slack-4A154B?logo=slack&logoColor=white)](https://join.slack.com/t/sonicverse-oss/shared_invite/zt-3u969i5rr-cmfgEycFAi8V7Baj0uBx0A)
 
 Self-hosted Docker Compose stack for live radio streaming. Ingest from any studio encoder, deliver via Icecast2 and HLS adaptive bitrate, with automatic fallback, silence detection, PostHog analytics, Pushover alerts, and a real-time operator dashboard.
@@ -103,7 +104,7 @@ For the quickest setup with minimal typing:
 bash <(curl -fsSL https://sonicverse.short.gy/install-audiostack)
 ```
 
-This works from any directory and automatically handles cloning the repository, checking prerequisites, and configuring your stack. Equivalent to the "Minimal GHCR deployment" option below.
+This works from any directory and automatically handles cloning the repository, checking prerequisites, and configuring your stack. Equivalent to the "Minimal container-image deployment" option below.
 
 **Features:**
 - Works from any directory (automatic git clone)
@@ -111,7 +112,7 @@ This works from any directory and automatically handles cloning the repository, 
 - Installs only essentials for running (no development dependencies)
 - ~2–5 minutes total
 
-### 🚀 Recommended: Minimal GHCR deployment (default)
+### 🚀 Recommended: Minimal container-image deployment (default)
 
 Fastest option for production deployments — no building or local dependencies required:
 
@@ -124,13 +125,36 @@ cd audiostreaming-stack
 This installs **only what's needed to run**:
 - Docker/Docker Compose (auto-installed if missing)
 - Configuration file (`.env`)
-- Pre-built images from GHCR
+- Pre-built images (published to GHCR and Docker Hub)
 
 **What's _not_ installed:**
 - Node.js / npm (dashboard already built into image)
 - Python / pip (analytics & API already built into image)
 
 **Time:** ~2–5 minutes (mostly downloading ~500MB of container images)
+
+### Container registries
+
+Pre-built service images are published to both registries:
+
+- **Primary (default): Docker Hub** under `sonicverse`.
+- **Mirror: GHCR** under `ghcr.io/sonicverse-eu/audiostreaming-stack`.
+
+Docker Hub image names:
+
+- `docker.io/sonicverse/audiostreaming-stack-icecast:latest`
+- `docker.io/sonicverse/audiostreaming-stack-liquidsoap:latest`
+- `docker.io/sonicverse/audiostreaming-stack-nginx:latest`
+- `docker.io/sonicverse/audiostreaming-stack-status-api:latest`
+- `docker.io/sonicverse/audiostreaming-stack-analytics:latest`
+
+GHCR mirror names:
+
+- `ghcr.io/sonicverse-eu/audiostreaming-stack/icecast:latest`
+- `ghcr.io/sonicverse-eu/audiostreaming-stack/liquidsoap:latest`
+- `ghcr.io/sonicverse-eu/audiostreaming-stack/nginx:latest`
+- `ghcr.io/sonicverse-eu/audiostreaming-stack/status-api:latest`
+- `ghcr.io/sonicverse-eu/audiostreaming-stack/analytics:latest`
 
 ### 📦 Full development environment
 
@@ -156,7 +180,7 @@ This includes everything above **plus**:
 
 ### 🔨 Build containers locally (advanced)
 
-Build container images locally instead of pulling from GHCR — use this if you need to modify Dockerfile or container code:
+Build container images locally instead of pulling pre-built images — use this if you need to modify Dockerfile or container code:
 
 **Via short link:**
 ```bash
@@ -430,7 +454,7 @@ Alerts have a 5-minute cooldown to prevent spam.
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | **Lint** | Push / PR to `main` | Runs component-aware checks: Ruff (Python), ESLint (TypeScript), hadolint (Dockerfiles), yamllint (YAML) |
-| **Docker Build & Push** | Push / PR to `main`, tags `v*.*.*` | Builds service images; on PRs, only changed services are built |
+| **Docker Build & Push** | Push / PR to `main`, tags `v*.*.*` | Builds service images and publishes to GHCR + Docker Hub; on PRs, only changed services are built |
 | **AI Autolabel Issues** | Issue opened / edited / reopened | Applies `Type:`, `Scope:`, and `Priority:` labels via GitHub Models (GPT-4o-mini) |
 | **Sync Status Labels** | Issue / PR labeled or unlabeled | Keeps `Status:` labels in sync between an issue and its connected PRs (issue → PR, one-way) |
 | **Mirror Issue Labels to PRs** | PR opened / edited / synchronize; issue labeled / unlabeled | Copies all labels from a linked issue to its connected PRs (one-way, add-only). |
