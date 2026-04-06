@@ -1,6 +1,11 @@
 FROM savonet/liquidsoap:v2.4.2
 
+# hadolint ignore=DL3002
 USER root
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libsndfile1=1.2.2-2+deb13u1 && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY radio.liq /etc/liquidsoap/radio.liq
 
