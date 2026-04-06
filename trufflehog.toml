@@ -1,0 +1,18 @@
+# TruffleHog secret scanning configuration
+# https://trufflesecurity.com/open-source/trufflehog
+#
+# Run locally (git history):
+#   trufflehog git file://. --config trufflehog.toml
+#
+# Run locally (filesystem, current working tree only):
+#   trufflehog filesystem . --config trufflehog.toml --no-git
+#
+# CI scanning is handled automatically by the TruffleHog GitHub Actions workflow.
+# See .github/workflows/trufflehog.yml
+
+# Report only secrets that have been positively verified — eliminates most false
+# positives while retaining high-confidence findings.
+only-verified = true
+
+# Number of concurrent scanner goroutines.
+concurrency = 4

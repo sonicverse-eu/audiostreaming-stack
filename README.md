@@ -460,6 +460,7 @@ Alerts have a 5-minute cooldown to prevent spam.
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | **Lint** | Push / PR to `main` | Runs component-aware checks: Ruff (Python), ESLint (TypeScript), hadolint (Dockerfiles), yamllint (YAML) |
+| **TruffleHog Secret Scan** | Push / PR to `main` | Scans commit history for verified leaked secrets using the `trufflehog.toml` configuration |
 | **Docker Build & Push** | Push / PR to `main`, tags `v*.*.*` | Builds service images and publishes to GHCR + Docker Hub; on PRs, only changed services are built |
 | **AI Autolabel Issues** | Issue opened / edited / reopened | Applies `Type:`, `Scope:`, and `Priority:` labels via GitHub Models (GPT-4o-mini) |
 | **Sync Status Labels** | Issue / PR labeled or unlabeled | Keeps `Status:` labels in sync between an issue and its connected PRs (issue → PR, one-way) |
@@ -487,6 +488,32 @@ To reduce CI time and avoid unnecessary jobs, pull request checks are scoped by 
 - The workflow uses the `GITHUB_TOKEN` built-in secret — no extra secrets needed.
 - It avoids automation loops by skipping events triggered by bot actors (login ending in `[bot]` or matching `copilot-*`).
 - Cross-reference discovery is capped at 100 events per issue (GitHub GraphQL page-size limit). Issues with more than 100 linked PRs may not be fully synced in a single run.
+
+## Secret Scanning
+
+This repository uses [TruffleHog](https://trufflesecurity.com/open-source/trufflehog) to detect secrets and sensitive data leaks. Scanning runs automatically on every push and pull request to `main` via the **TruffleHog Secret Scan** workflow (see `.github/workflows/trufflehog.yml`).
+
+Configuration is in `trufflehog.toml` at the repository root. Only **verified** secrets are reported, which removes most false positives.
+
+### Run TruffleHog locally
+
+Scan the full git history:
+
+```bash
+trufflehog git file://. --config trufflehog.toml
+```
+
+Scan only the current working tree (no history):
+
+```bash
+trufflehog filesystem . --config trufflehog.toml --no-git
+```
+
+Install TruffleHog if you don't have it:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+```
 
 ## Contributing
 
