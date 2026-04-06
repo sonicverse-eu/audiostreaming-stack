@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${STATION_NAME} — Stream Status</title>
+    <title>${STATION_NAME_ESC} — Stream Status</title>
     <style>
         :root {
             --bg-color: #0f1117;
@@ -209,7 +209,7 @@
     <div class="container">
         <div class="header">
             <div class="sonicverse-brand">Sonicverse</div>
-            <h1>${STATION_NAME}</h1>
+            <h1>${STATION_NAME_ESC}</h1>
             <p>Live Audio Streaming Infrastructure</p>
         </div>
 
@@ -234,7 +234,7 @@
         
         <div class="contact-info">
             Questions or inquiries? <br />
-            Contact <a href="mailto:${STATION_ADMIN_EMAIL}">${STATION_ADMIN_EMAIL}</a>
+            Contact <a href="mailto:${STATION_ADMIN_EMAIL_ESC}">${STATION_ADMIN_EMAIL_ESC}</a>
         </div>
     </div>
 

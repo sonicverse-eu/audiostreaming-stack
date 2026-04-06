@@ -11,7 +11,15 @@ envsubst '$ICECAST_HOSTNAME' < /etc/nginx/nginx.conf.template > /tmp/nginx-subst
 mkdir -p /usr/share/nginx/html
 export STATION_NAME="${STATION_NAME:-Radio Station}"
 export STATION_ADMIN_EMAIL="${STATION_ADMIN_EMAIL:-admin@example.com}"
-envsubst '$STATION_NAME $STATION_ADMIN_EMAIL $ICECAST_HOSTNAME' < /etc/nginx/index.html.template > /usr/share/nginx/html/index.html
+
+escape_html() {
+    echo "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g' -e "s/'/\&#39;/g"
+}
+
+export STATION_NAME_ESC="$(escape_html "$STATION_NAME")"
+export STATION_ADMIN_EMAIL_ESC="$(escape_html "$STATION_ADMIN_EMAIL")"
+
+envsubst '$STATION_NAME_ESC $STATION_ADMIN_EMAIL_ESC $ICECAST_HOSTNAME' < /etc/nginx/index.html.template > /usr/share/nginx/html/index.html
 
 if [ -f "$CERT_PATH" ]; then
     echo "[nginx] SSL certificate found for $HOSTNAME — enabling HTTPS"
