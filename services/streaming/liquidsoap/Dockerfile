@@ -1,12 +1,13 @@
 FROM savonet/liquidsoap:v2.4.2
 
-# hadolint ignore=DL3002
+ARG OPENSSL_PROVIDER_LEGACY_VERSION=3.5.4-1~deb13u2
+
 USER root
 
-# hadolint ignore=DL3008
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends --only-upgrade libfreetype6 \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        "openssl-provider-legacy=${OPENSSL_PROVIDER_LEGACY_VERSION}" && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY radio.liq /etc/liquidsoap/radio.liq
 
