@@ -131,8 +131,10 @@ export function Dashboard() {
 
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-[#2a2e3d] bg-[#1a1d27]">
-        <h1 className="text-base font-semibold">
-          {config?.station_name || "Broadcast"} — Status Panel
+        <h1 className="text-base font-semibold flex items-center gap-2">
+          <span className="bg-linear-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent font-bold">Sonicverse</span>
+          <span className="text-[#8b90a0]">|</span>
+          <span>{config?.station_name || "Broadcast"} — Status Panel</span>
         </h1>
         <div className="flex items-center gap-4">
           <span className="text-[#8b90a0] text-xs">{user?.email}</span>
