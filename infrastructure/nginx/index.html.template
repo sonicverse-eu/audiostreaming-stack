@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${STATION_NAME_ESC} — Stream Status</title>
+    <title>${STATION_NAME_ESC} — Stream on ${ICECAST_HOSTNAME}</title>
     <style>
         :root {
             --bg-color: #0f1117;
@@ -210,7 +210,7 @@
         <div class="header">
             <div class="sonicverse-brand">Sonicverse</div>
             <h1>${STATION_NAME_ESC}</h1>
-            <p>Live Audio Streaming Infrastructure</p>
+            <p>Streaming Audio Infrastructure at <span style="color: var(--text-main); font-weight: 500;">${ICECAST_HOSTNAME}</span></p>
         </div>
 
         <div class="section-title">Available Streams</div>

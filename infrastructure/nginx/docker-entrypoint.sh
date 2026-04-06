@@ -9,15 +9,16 @@ envsubst '$ICECAST_HOSTNAME' < /etc/nginx/nginx.conf.template > /tmp/nginx-subst
 
 # Substitute template for root index HTML with custom variables
 mkdir -p /usr/share/nginx/html
-export STATION_NAME="${STATION_NAME:-Radio Station}"
-export STATION_ADMIN_EMAIL="${STATION_ADMIN_EMAIL:-admin@example.com}"
+# Fallback support for requested aliases
+export FINAL_RADIO_NAME="${RADIO_NAME:-${STATION_NAME:-Radio Station}}"
+export FINAL_CONTACT_EMAIL="${CONTACT_EMAIL:-${STATION_ADMIN_EMAIL:-admin@example.com}}"
 
 escape_html() {
     echo "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g' -e "s/'/\&#39;/g"
 }
 
-export STATION_NAME_ESC="$(escape_html "$STATION_NAME")"
-export STATION_ADMIN_EMAIL_ESC="$(escape_html "$STATION_ADMIN_EMAIL")"
+export STATION_NAME_ESC="$(escape_html "$FINAL_RADIO_NAME")"
+export STATION_ADMIN_EMAIL_ESC="$(escape_html "$FINAL_CONTACT_EMAIL")"
 
 envsubst '$STATION_NAME_ESC $STATION_ADMIN_EMAIL_ESC $ICECAST_HOSTNAME' < /etc/nginx/index.html.template > /usr/share/nginx/html/index.html
 
