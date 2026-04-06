@@ -1,0 +1,85 @@
+version: "2"
+
+language: "en-US"
+
+tone_instructions: >
+  Be concise and constructive. Focus on correctness, security, and maintainability.
+  Keep suggestions actionable and relevant to the audiostreaming-stack project.
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  auto_title_placeholder: "@coderabbitai"
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  sequence_diagrams: true
+  changed_files_summary: true
+  labeling_instructions:
+    - label: "python"
+      instructions: >
+        Apply when changes touch .py files under services/analytics/ or apps/status-api/.
+    - label: "typescript"
+      instructions: >
+        Apply when changes touch .ts or .tsx files under apps/dashboard/.
+    - label: "infrastructure"
+      instructions: >
+        Apply when changes touch Dockerfiles, docker-compose.yml, or files under
+        infrastructure/.
+    - label: "streaming"
+      instructions: >
+        Apply when changes touch files under services/streaming/ (liquidsoap,
+        icecast, etc.).
+    - label: "ci"
+      instructions: >
+        Apply when changes touch files under .github/workflows/.
+    - label: "documentation"
+      instructions: >
+        Apply when changes touch .md files or files under docs/.
+  path_instructions:
+    - path: "services/analytics/**/*.py"
+      instructions: >
+        Verify Ruff compliance (rules E, F, W, I; line length 100; target Python 3.12).
+        Check for correct use of async patterns and proper error handling.
+    - path: "apps/status-api/**/*.py"
+      instructions: >
+        Verify Ruff compliance (rules E, F, W, I; line length 100; target Python 3.12).
+        Check API endpoint correctness and response format consistency.
+    - path: "apps/dashboard/**/*.{ts,tsx}"
+      instructions: >
+        Ensure ESLint-clean TypeScript/TSX with no warnings. Verify Next.js best
+        practices and accessibility considerations.
+    - path: "**/Dockerfile"
+      instructions: >
+        Check for hadolint compliance. Allowed suppressions: DL3002, DL3008, DL3009.
+        Ensure images are pinned to specific digest or version tags for reproducibility.
+    - path: "docker-compose.yml"
+      instructions: >
+        Verify service health checks, restart policies, and environment variable
+        references are consistent with .env.example.
+    - path: ".github/workflows/**/*.yml"
+      instructions: >
+        Check for pinned action versions, correct use of secrets, and that jobs
+        follow the repository's blacksmith runner convention.
+    - path: "infrastructure/nginx/**"
+      instructions: >
+        Review for security headers, TLS configuration correctness, and correct
+        proxy settings for the audio streaming use case.
+    - path: "services/streaming/liquidsoap/**"
+      instructions: >
+        Review Liquidsoap script logic for correct fallback handling, stream
+        metadata, and error recovery.
+    - path: "**/*.sh"
+      instructions: >
+        Verify scripts use set -e, 4-space indentation, and double-quoted variables.
+        Check for shellcheck-clean code.
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+
+chat:
+  auto_reply: true
