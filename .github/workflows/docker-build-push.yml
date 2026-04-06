@@ -17,6 +17,7 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       docs_only: ${{ steps.docs_only.outputs.value }}
+      matrix: ${{ steps.matrix.outputs.value }}
       affects_all: ${{ steps.filter.outputs.affects_all }}
       icecast: ${{ steps.filter.outputs.icecast }}
       liquidsoap: ${{ steps.filter.outputs.liquidsoap }}
@@ -75,80 +76,76 @@ jobs:
           echo "status_api=${{ steps.filter.outputs.status_api }}"
           echo "analytics=${{ steps.filter.outputs.analytics }}"
 
+      - name: Build dynamic matrix
+        id: matrix
+        run: |
+          set -e
+
+          matrix='{"service":['
+          sep=''
+
+          add_service() {
+            local name="$1"
+            local context="$2"
+            local platforms="$3"
+
+            matrix+="$sep{\"name\":\"$name\",\"context\":\"$context\""
+            if [[ -n "$platforms" ]]; then
+              matrix+=",\"platforms\":\"$platforms\""
+            fi
+            matrix+="}"
+            sep=','
+          }
+
+          if [[ "${{ github.event_name }}" != 'pull_request' || \
+                "${{ steps.filter.outputs.affects_all }}" == 'true' ]]; then
+            add_service icecast ./services/streaming/icecast ''
+            add_service liquidsoap ./services/streaming/liquidsoap linux/amd64,linux/arm64
+            add_service nginx ./infrastructure/nginx ''
+            add_service status-api ./apps/status-api linux/amd64
+            add_service analytics ./services/analytics ''
+          elif [[ "${{ steps.docs_only.outputs.value }}" != 'true' ]]; then
+            [[ "${{ steps.filter.outputs.icecast }}" == 'true' ]] && \
+              add_service icecast ./services/streaming/icecast ''
+            [[ "${{ steps.filter.outputs.liquidsoap }}" == 'true' ]] && \
+              add_service liquidsoap ./services/streaming/liquidsoap linux/amd64,linux/arm64
+            [[ "${{ steps.filter.outputs.nginx }}" == 'true' ]] && \
+              add_service nginx ./infrastructure/nginx ''
+            [[ "${{ steps.filter.outputs.status_api }}" == 'true' ]] && \
+              add_service status-api ./apps/status-api linux/amd64
+            [[ "${{ steps.filter.outputs.analytics }}" == 'true' ]] && \
+              add_service analytics ./services/analytics ''
+          fi
+
+          matrix+=']}'
+          echo "value=$matrix" >> "$GITHUB_OUTPUT"
+          echo "matrix=$matrix"
+
   build:
     name: Build ${{ matrix.service.name }}
     runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.docs_only != 'true'
     permissions:
       contents: read
       packages: write
 
     strategy:
       fail-fast: false
-      matrix:
-        service:
-          - name: icecast
-            context: ./services/streaming/icecast
-          - name: liquidsoap
-            context: ./services/streaming/liquidsoap
-            # Liquidsoap arm64 support depends on the base image — disable if unavailable
-            platforms: linux/amd64,linux/arm64
-          - name: nginx
-            context: ./infrastructure/nginx
-          - name: status-api
-            context: ./apps/status-api
-            # Mounts the Docker socket at runtime — only meaningful on amd64 hosts
-            platforms: linux/amd64
-          - name: analytics
-            context: ./services/analytics
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
 
     steps:
-      - name: Decide whether this matrix item should build
-        id: should_build
-        run: |
-          set -e
-          should_build=false
-
-          if [[ "${{ github.event_name }}" != 'pull_request' || \
-                "${{ needs.changes.outputs.affects_all }}" == 'true' ]]; then
-            should_build=true
-          else
-            case "${{ matrix.service.name }}" in
-              icecast)
-                [[ "${{ needs.changes.outputs.icecast }}" == 'true' ]] && should_build=true
-                ;;
-              liquidsoap)
-                [[ "${{ needs.changes.outputs.liquidsoap }}" == 'true' ]] && should_build=true
-                ;;
-              nginx)
-                [[ "${{ needs.changes.outputs.nginx }}" == 'true' ]] && should_build=true
-                ;;
-              status-api)
-                [[ "${{ needs.changes.outputs.status_api }}" == 'true' ]] && should_build=true
-                ;;
-              analytics)
-                [[ "${{ needs.changes.outputs.analytics }}" == 'true' ]] && should_build=true
-                ;;
-            esac
-          fi
-
-          echo "value=$should_build" >> "$GITHUB_OUTPUT"
-          echo "should_build=$should_build"
-
       - name: Checkout
-        if: steps.should_build.outputs.value == 'true'
         uses: actions/checkout@v4
 
       - name: Set up QEMU
-        if: steps.should_build.outputs.value == 'true'
         uses: docker/setup-qemu-action@v4
 
       - name: Setup Blacksmith Builder
-        if: steps.should_build.outputs.value == 'true'
         uses: useblacksmith/setup-docker-builder@v1
 
       - name: Validate Docker Hub credentials
-        if: github.event_name != 'pull_request' && steps.should_build.outputs.value == 'true'
+        if: github.event_name == 'push'
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -160,7 +157,7 @@ jobs:
           fi
 
       - name: Log in to GHCR
-        if: github.event_name != 'pull_request' && steps.should_build.outputs.value == 'true'
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -168,7 +165,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request' && steps.should_build.outputs.value == 'true'
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: docker.io
@@ -177,7 +174,6 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        if: steps.should_build.outputs.value == 'true'
         uses: docker/metadata-action@v6
         with:
           images: |
@@ -193,18 +189,17 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
-        if: steps.should_build.outputs.value == 'true'
         id: build_push
         uses: useblacksmith/build-push-action@v2
         with:
           context: ${{ matrix.service.context }}
           platforms: ${{ matrix.service.platforms || 'linux/amd64,linux/arm64' }}
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Verify GHCR and Docker Hub digests match
-        if: github.event_name != 'pull_request' && steps.should_build.outputs.value == 'true'
+        if: github.event_name == 'push'
         env:
           DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_NAMESPACE }}
         run: |
@@ -224,10 +219,6 @@ jobs:
             echo "Digest mismatch between GHCR and Docker Hub for ${{ matrix.service.name }}" >&2
             exit 1
           fi
-
-      - name: Skip unchanged service on PR
-        if: github.event_name == 'pull_request' && steps.should_build.outputs.value != 'true'
-        run: echo "No relevant changes for ${{ matrix.service.name }} in this PR. Skipping build."
 
   docs-only:
     name: Docs-only PR optimization
