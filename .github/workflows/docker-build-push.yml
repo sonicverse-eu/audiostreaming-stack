@@ -249,8 +249,9 @@ jobs:
               local raw_output=""
 
               if raw_output="$(inspect_manifest_raw "$ref")"; then
-                  last_inspect_raw="$raw_output"
-                  printf '%s\n' "$raw_output" | jq -c --arg platforms "$platforms" '
+                  local normalized_manifest=""
+
+                  normalized_manifest="$(printf '%s\n' "$raw_output" | jq -c --arg platforms "$platforms" '
                       def pkey($p):
                         ($p.os + "/" + $p.architecture)
                         + (if (($p.variant // "") != "") then "/" + $p.variant else "" end);
@@ -273,8 +274,16 @@ jobs:
                           | {key: pkey($platform), value: (.digest // .Digest)}
                         )
                       | from_entries'
-              else
-                  last_inspect_raw="$raw_output"
+                        )"
+
+                        if [[ -z "$normalized_manifest" || "$normalized_manifest" == "null" ]]; then
+                          jq -cn --arg raw "$raw_output" '{raw: $raw, normalized: null}'
+                          return 1
+                        fi
+
+                        jq -cn --arg raw "$raw_output" --argjson normalized "$normalized_manifest" '{raw: $raw, normalized: $normalized}'
+                      else
+                        jq -cn --arg raw "$raw_output" '{raw: $raw, normalized: null}'
                   return 1
               fi
           }
@@ -284,16 +293,21 @@ jobs:
               local label="$2"
               local attempt=1
               local backoff="${initial_backoff_seconds}"
+              local inspect_payload=""
               local normalized_manifest=""
+              local raw_output=""
 
               while [[ "$attempt" -le "$max_attempts" ]]; do
                   printf '%s%s\n' \
                       "Inspecting ${label} manifest for ${ref} " \
                       "(attempt ${attempt}/${max_attempts})" >&2
 
-                  if normalized_manifest="$(normalize_manifest "$ref")"; then
-                      if [[ -n "$normalized_manifest" && "$normalized_manifest" != "null" ]]; then
-                          printf '%s\n' "$normalized_manifest"
+                if inspect_payload="$(normalize_manifest "$ref")"; then
+                  raw_output="$(printf '%s\n' "$inspect_payload" | jq -r '.raw // empty')"
+                  normalized_manifest="$(printf '%s\n' "$inspect_payload" | jq -c '.normalized // empty')"
+
+                  if [[ -n "$normalized_manifest" && "$normalized_manifest" != "null" && "$normalized_manifest" != "{}" ]]; then
+                    printf '%s\n' "$inspect_payload"
                           return 0
                       fi
 
@@ -301,10 +315,12 @@ jobs:
                           "Attempt ${attempt}/${max_attempts} for ${label} (${ref}) " \
                           "returned an empty normalized manifest; retrying in ${backoff}s" >&2
                   else
+                  inspect_payload="${inspect_payload:-}"
+                  raw_output="$(printf '%s\n' "$inspect_payload" | jq -r '.raw // empty')"
                       printf '%s%s\n' \
                           "Attempt ${attempt}/${max_attempts} to inspect ${label} (${ref}) " \
                           "failed; retrying in ${backoff}s" >&2
-                      printf 'Raw inspect response for %s (%s):\n%s\n' "${label}" "${ref}" "$last_inspect_raw" >&2
+                  printf 'Raw inspect response for %s (%s):\n%s\n' "${label}" "${ref}" "$raw_output" >&2
                   fi
 
                   if [[ "$attempt" -lt "$max_attempts" ]]; then
@@ -319,10 +335,13 @@ jobs:
               return 1
           }
 
-          ghcr_manifest="$(inspect_with_retry "$ghcr_ref" "GHCR")" || ghcr_manifest=""
-          ghcr_inspect_raw="$last_inspect_raw"
-          dockerhub_manifest="$(inspect_with_retry "$dockerhub_ref" "Docker Hub")" || dockerhub_manifest=""
-          dockerhub_inspect_raw="$last_inspect_raw"
+          ghcr_inspect_payload="$(inspect_with_retry "$ghcr_ref" "GHCR")" || ghcr_inspect_payload=""
+          ghcr_inspect_raw="$(printf '%s\n' "$ghcr_inspect_payload" | jq -r '.raw // empty')"
+          ghcr_manifest="$(printf '%s\n' "$ghcr_inspect_payload" | jq -c '.normalized // empty')"
+
+          dockerhub_inspect_payload="$(inspect_with_retry "$dockerhub_ref" "Docker Hub")" || dockerhub_inspect_payload=""
+          dockerhub_inspect_raw="$(printf '%s\n' "$dockerhub_inspect_payload" | jq -r '.raw // empty')"
+          dockerhub_manifest="$(printf '%s\n' "$dockerhub_inspect_payload" | jq -c '.normalized // empty')"
 
           if [[ -z "$ghcr_manifest" || -z "$dockerhub_manifest" ]]; then
               printf '%s%s\n' \
