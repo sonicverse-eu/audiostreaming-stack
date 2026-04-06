@@ -1,5 +1,6 @@
 FROM savonet/liquidsoap:v2.4.2
 
+# hadolint ignore=DL3002
 USER root
 
 # hadolint ignore=DL3008
