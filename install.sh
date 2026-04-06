@@ -193,7 +193,7 @@ if docker compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
             info "Pulling latest changes..."
             git pull 2>/dev/null || true
             echo ""
-            info "Pulling fresh images (bypassing cache)..."
+            info "Pulling latest images (sequential pull)..."
             docker compose pull --no-parallel || true
             echo ""
             info "Rebuilding any local images..."
@@ -472,11 +472,11 @@ STEP_NUM=$((STEP_NUM + 1))
 step "$STEP_NUM" "Building containers"
 
 if [ "$USE_PREBUILT" = "true" ]; then
-    info "Pulling pre-built images from Docker Hub or configured registry (no cache)..."
+    info "Pulling pre-built images from Docker Hub or configured registry..."
     echo ""
     docker compose pull --no-parallel || { error "Pull failed. Images may not exist yet. Run with --build-local to build locally instead."; exit 1; }
     echo ""
-    success "All images pulled (fresh, no cache)"
+    success "All images pulled successfully"
 else
     info "Building containers locally. This may take a few minutes on first run..."
     echo ""
