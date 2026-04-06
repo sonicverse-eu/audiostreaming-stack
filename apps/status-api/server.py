@@ -11,11 +11,12 @@ import glob as globmod
 import json
 import os
 import shutil
-import subprocess
 import time
 from collections import deque
 
+import docker
 import requests
+from docker.errors import DockerException, NotFound
 from flask import Flask, Response, g, jsonify, request
 from flask_cors import CORS
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -358,17 +359,17 @@ def api_alerts():
 def api_containers():
     """Get Docker container status for all stack services."""
     try:
-        result = subprocess.run(
-            ["docker", "ps", "-a", "--filter", "name=sonicverse-", "--format",
-             '{"name":"{{.Names}}","status":"{{.Status}}","image":"{{.Image}}","ports":"{{.Ports}}"}'],
-            capture_output=True, text=True, timeout=5,
-        )
-        containers = []
-        for line in result.stdout.strip().split("\n"):
-            if line:
-                containers.append(json.loads(line))
+        containers = [
+            {
+                "name": container.name,
+                "status": format_container_status(container),
+                "image": format_container_image(container),
+                "ports": format_container_ports(container),
+            }
+            for container in get_stack_containers()
+        ]
         return jsonify(containers)
-    except Exception as e:
+    except DockerException as e:
         return jsonify({"error": str(e)})
 
 
@@ -486,21 +487,142 @@ def api_emergency_audio_delete():
 
 ALLOWED_SERVICES = {"icecast", "liquidsoap", "nginx", "analytics", "status-api", "certbot"}
 
+@functools.lru_cache(maxsize=1)
+def get_docker_client():
+    return docker.from_env()
+
+
+def get_stack_containers():
+    containers = get_docker_client().containers.list(all=True, filters={"name": "sonicverse-"})
+    return sorted(containers, key=lambda container: container.name)
+
+
+def get_service_container(service):
+    return get_docker_client().containers.get(f"sonicverse-{service}")
+
+
+def format_container_status(container):
+    state = container.attrs.get("State", {})
+    status = state.get("Status", container.status)
+    if status == "running":
+        health = state.get("Health", {}).get("Status")
+        if health and health != "healthy":
+            return f"Up ({health})"
+        return "Up"
+    if status == "exited":
+        exit_code = state.get("ExitCode")
+        if exit_code is not None:
+            return f"Exited ({exit_code})"
+        return "Exited"
+    return status.replace("_", " ").title()
+
+
+def format_container_image(container):
+    tags = container.image.tags
+    if tags:
+        return tags[0]
+    return container.image.short_id
+
+
+def format_container_ports(container):
+    ports = container.attrs.get("NetworkSettings", {}).get("Ports") or {}
+    formatted = []
+    for container_port, bindings in ports.items():
+        if not bindings:
+            formatted.append(container_port)
+            continue
+        for binding in bindings:
+            host_ip = binding.get("HostIp") or ""
+            host_port = binding.get("HostPort") or ""
+            host_binding = f"{host_ip}:{host_port}" if host_ip else host_port
+            if host_binding:
+                formatted.append(f"{host_binding}->{container_port}")
+            else:
+                formatted.append(container_port)
+    return ", ".join(formatted)
+
+
+def format_bytes(size_bytes):
+    size = float(size_bytes or 0)
+    units = ["B", "KiB", "MiB", "GiB", "TiB"]
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(size)} {unit}"
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TiB"
+
+
+def run_logs(service):
+    output = get_service_container(service).logs(tail=80, stdout=True, stderr=True)
+    return output.decode("utf-8", errors="replace").strip() or "(no output)", 0
+
+
+def run_disk_usage(_):
+    df = get_docker_client().api.df()
+    images = df.get("Images", [])
+    containers = df.get("Containers", [])
+    volumes = df.get("Volumes", [])
+    build_cache = df.get("BuildCache", [])
+
+    lines = [
+        f"Images: {len(images)} total, {sum(1 for image in images if image.get('Containers'))} in use",
+        f"Containers: {len(containers)} total, {sum(1 for item in containers if item.get('State') == 'running')} running",
+        f"Volumes: {len(volumes)} total",
+        f"Build cache entries: {len(build_cache)}",
+        f"Image layers size: {format_bytes(df.get('LayersSize', 0))}",
+        f"Volumes size: {format_bytes(sum(volume.get('UsageData', {}).get('Size', 0) for volume in volumes))}",
+        f"Build cache size: {format_bytes(sum(item.get('Size', 0) for item in build_cache))}",
+    ]
+    return "\n".join(lines), 0
+
+
+def run_icecast_stats(_):
+    response = requests.get(
+        f"{ICECAST_URL}/status-json.xsl",
+        auth=(ICECAST_ADMIN_USER, ICECAST_ADMIN_PASSWORD),
+        timeout=10,
+    )
+    response.raise_for_status()
+    return response.text.strip() or "(no output)", 0
+
+
+def run_restart_service(service):
+    container = get_service_container(service)
+    container.restart(timeout=10)
+    return f"Restarted {container.name}", 0
+
+
+def run_restart_stack(_):
+    containers = [container for container in get_stack_containers() if container.status == "running"]
+    containers.sort(key=lambda container: container.name == "sonicverse-status-api")
+    restarted = []
+    for container in containers:
+        container.restart(timeout=10)
+        restarted.append(container.name)
+    return f"Restarted {', '.join(restarted)}", 0
+
+
+def run_renew_ssl(_):
+    exit_code, output = get_service_container("certbot").exec_run(["certbot", "renew"])
+    return output.decode("utf-8", errors="replace").strip() or "(no output)", exit_code
+
+
 READONLY_COMMANDS = {
     "logs": {
         "label": "View recent logs",
-        "build": lambda svc: ["docker", "logs", "--tail", "80", f"sonicverse-{svc}"],
+        "run": run_logs,
         "requires_service": True,
     },
     "disk_usage": {
         "label": "Disk usage",
-        "build": lambda _: ["docker", "system", "df"],
+        "run": run_disk_usage,
         "requires_service": False,
     },
     "icecast_stats": {
         "label": "Icecast raw stats",
-        "build": lambda _: ["curl", "-s", f"{ICECAST_URL}/status-json.xsl",
-                            "-u", f"{ICECAST_ADMIN_USER}:{ICECAST_ADMIN_PASSWORD}"],
+        "run": run_icecast_stats,
         "requires_service": False,
     },
 }
@@ -508,18 +630,17 @@ READONLY_COMMANDS = {
 RISKY_COMMANDS = {
     "restart_service": {
         "label": "Restart a service",
-        "build": lambda svc: ["docker", "restart", f"sonicverse-{svc}"],
+        "run": run_restart_service,
         "requires_service": True,
     },
     "restart_stack": {
         "label": "Restart entire stack",
-        "build": lambda _: ["docker", "compose", "restart"],
+        "run": run_restart_stack,
         "requires_service": False,
     },
     "renew_ssl": {
         "label": "Renew SSL certificate",
-        "build": lambda _: ["docker", "compose", "run", "--rm", "--entrypoint", "",
-                            "certbot", "certbot", "renew"],
+        "run": run_renew_ssl,
         "requires_service": False,
     },
 }
@@ -572,24 +693,18 @@ def api_commands_run():
             return jsonify({"error": f"Invalid service: {service}"}), 400
 
     try:
-        cmd = cmd_info["build"](service)
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        output = result.stdout
-        if result.stderr:
-            output += ("\n" if output else "") + result.stderr
-
+        output, exit_code = cmd_info["run"](service)
         return jsonify({
-            "ok": result.returncode == 0,
+            "ok": exit_code == 0,
             "output": output.strip() or "(no output)",
-            "exit_code": result.returncode,
+            "exit_code": exit_code,
         })
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": "Command timed out (30s)"}), 504
+    except requests.Timeout:
+        return jsonify({"error": "Command timed out"}), 504
+    except NotFound as e:
+        return jsonify({"error": str(e)}), 404
+    except (DockerException, requests.RequestException) as e:
+        return jsonify({"error": str(e)}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
