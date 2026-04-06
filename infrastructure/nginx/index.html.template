@@ -203,6 +203,9 @@
             .header h1 {
                 font-size: 1.75rem;
             }
+            .endpoints-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
