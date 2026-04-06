@@ -460,7 +460,7 @@ Alerts have a 5-minute cooldown to prevent spam.
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | **Lint** | Push / PR to `main` | Runs component-aware checks: Ruff (Python), ESLint (TypeScript), hadolint (Dockerfiles), yamllint (YAML) |
-| **TruffleHog Secret Scan** | Push / PR to `main` | Scans commit history for verified leaked secrets using the `trufflehog.toml` configuration |
+| **TruffleHog Secret Scan** | Push / PR to `main` | Scans commit history for verified leaked secrets using TruffleHog's CLI flags |
 | **Docker Build & Push** | Push / PR to `main`, tags `v*.*.*` | Builds service images and publishes to GHCR + Docker Hub; on PRs, only changed services are built |
 | **AI Autolabel Issues** | Issue opened / edited / reopened | Applies `Type:`, `Scope:`, and `Priority:` labels via GitHub Models (GPT-4o-mini) |
 | **Sync Status Labels** | Issue / PR labeled or unlabeled | Keeps `Status:` labels in sync between an issue and its connected PRs (issue → PR, one-way) |
@@ -493,20 +493,20 @@ To reduce CI time and avoid unnecessary jobs, pull request checks are scoped by 
 
 This repository uses [TruffleHog](https://trufflesecurity.com/open-source/trufflehog) to detect secrets and sensitive data leaks. Scanning runs automatically on every push and pull request to `main` via the **TruffleHog Secret Scan** workflow (see `.github/workflows/trufflehog.yml`).
 
-Configuration is in `trufflehog.toml` at the repository root. Only **verified** secrets are reported, which removes most false positives.
+The workflow reports only **verified** secrets and runs with a fixed concurrency of 4 to keep scans consistent.
 
 ### Run TruffleHog locally
 
 Scan the full git history:
 
 ```bash
-trufflehog git file://. --config trufflehog.toml
+trufflehog git file://. --results=verified --concurrency=4
 ```
 
 Scan only the current working tree (no history):
 
 ```bash
-trufflehog filesystem . --config trufflehog.toml --no-git
+trufflehog filesystem . --results=verified --concurrency=4 --no-git
 ```
 
 Install TruffleHog if you don't have it:
