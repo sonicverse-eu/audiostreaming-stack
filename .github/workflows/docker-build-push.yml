@@ -245,10 +245,13 @@ jobs:
                           })
                         | INDEX(pkey(.))
                       ) as $wanted
-                      | map(select(.Platform != null))
-                      | map(select(.Platform.os != "unknown" and .Platform.architecture != "unknown"))
-                      | map(select($wanted[pkey(.Platform)] != null))
-                      | map({key: pkey(.Platform), value: .Digest})
+                      | map(
+                          (.platform // .Platform) as $platform
+                          | select($platform != null)
+                          | select($platform.os != "unknown" and $platform.architecture != "unknown")
+                          | select($wanted[pkey($platform)] != null)
+                          | {key: pkey($platform), value: (.digest // .Digest)}
+                        )
                       | from_entries'
           }
 

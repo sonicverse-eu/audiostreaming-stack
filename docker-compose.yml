@@ -59,6 +59,8 @@ services:
       - "443:443"
     environment:
       - ICECAST_HOSTNAME=${ICECAST_HOSTNAME}
+      - STATION_NAME=${STATION_NAME:-Radio Station}
+      - STATION_ADMIN_EMAIL=${STATION_ADMIN_EMAIL:-admin@example.com}
     volumes:
       - hls-data:/hls:ro
       - ./certbot/conf:/etc/letsencrypt:ro

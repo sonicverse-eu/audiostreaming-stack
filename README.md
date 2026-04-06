@@ -465,6 +465,8 @@ Alerts have a 5-minute cooldown to prevent spam.
 | **Sync Status Labels** | Issue / PR labeled or unlabeled | Keeps `Status:` labels in sync between an issue and its connected PRs (issue → PR, one-way) |
 | **Mirror Issue Labels to PRs** | PR opened / edited / synchronize; issue labeled / unlabeled | Copies all labels from a linked issue to its connected PRs (one-way, add-only). |
 
+The Docker Build & Push workflow verifies that GHCR and Docker Hub both expose the expected runtime platforms for each service before it compares digests.
+
 ### CI path-based triggering
 
 To reduce CI time and avoid unnecessary jobs, pull request checks are scoped by changed paths.
