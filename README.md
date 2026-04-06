@@ -138,7 +138,11 @@ This installs **only what's needed to run**:
 Pre-built service images are published to both registries:
 
 - **Primary (default): Docker Hub** under `sonicverse`.
-- **Mirror: GHCR** under `ghcr.io/sonicverse-eu/audiostreaming-stack`.
+- **Mirror:** GHCR under `ghcr.io/sonicverse-eu/audiostreaming-stack`.
+
+The Build & Push Docker Images workflow verifies cross-registry parity per expected runtime platform
+for `linux/amd64`, `linux/arm64`, and configured `linux/386` targets.
+The check fails when a required platform is missing in either registry or when per-platform digests differ.
 
 Docker Hub image names:
 
