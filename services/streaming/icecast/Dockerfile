@@ -13,4 +13,7 @@ COPY icecast.xml /etc/icecast2/icecast.xml.template
 
 EXPOSE 8000
 
+RUN useradd -U -u 1000 appuser && chown -R 1000:1000 /etc/icecast2 /var/log/icecast2
+USER 1000
+
 ENTRYPOINT ["sh", "-c", "envsubst < /etc/icecast2/icecast.xml.template > /etc/icecast2/icecast.xml && exec icecast2 -c /etc/icecast2/icecast.xml"]
