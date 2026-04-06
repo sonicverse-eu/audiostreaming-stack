@@ -193,11 +193,13 @@ if docker compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
             info "Pulling latest changes..."
             git pull 2>/dev/null || true
             echo ""
-            info "Rebuilding containers with latest templates..."
-            docker compose build --no-cache nginx
+            info "Pulling fresh images (bypassing cache)..."
+            docker compose pull --no-parallel || true
+            echo ""
+            info "Rebuilding any local images..."
             docker compose build
             echo ""
-            info "Restarting with new images..."
+            info "Restarting with updated images..."
             docker compose down
             docker compose up -d
             echo ""
@@ -467,17 +469,11 @@ STEP_NUM=$((STEP_NUM + 1))
 step "$STEP_NUM" "Building containers"
 
 if [ "$USE_PREBUILT" = "true" ]; then
-    info "Pulling pre-built images from Docker Hub..."
+    info "Pulling pre-built images from Docker Hub or configured registry (no cache)..."
     echo ""
-    docker compose pull || { error "Pull failed. Images may not exist yet. Run with --build-local to build locally instead."; exit 1; }
+    docker compose pull --no-parallel || { error "Pull failed. Images may not exist yet. Run with --build-local to build locally instead."; exit 1; }
     echo ""
-    success "All images pulled from Docker Hub"
-    
-    # Always build nginx locally to ensure latest template is used
-    info "Building nginx locally with latest template..."
-    docker compose build nginx
-    echo ""
-    success "nginx built with latest template"
+    success "All images pulled (fresh, no cache)"
 else
     info "Building containers locally. This may take a few minutes on first run..."
     echo ""
