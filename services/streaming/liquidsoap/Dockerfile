@@ -1,4 +1,4 @@
-FROM savonet/liquidsoap:v2.4.2
+FROM savonet/liquidsoap:v2.4.x-latest
 
 ARG OPENSSL_PROVIDER_LEGACY_VERSION=3.5.4-1~deb13u2
 
