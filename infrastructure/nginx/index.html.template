@@ -94,6 +94,7 @@
 
         .endpoints-grid {
             display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 1rem;
             margin-bottom: 2.5rem;
         }
