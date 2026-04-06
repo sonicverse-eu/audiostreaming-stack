@@ -211,14 +211,39 @@ jobs:
           dockerhub_ref="docker.io/${DOCKERHUB_USERNAME}/audiostreaming-stack-${{ matrix.service.name }}"
           dockerhub_ref="${dockerhub_ref}:sha-${short_sha}"
 
-          ghcr_digest="$(docker buildx imagetools inspect "$ghcr_ref" --format '{{.Manifest.Digest}}')"
-          dockerhub_digest="$(docker buildx imagetools inspect "$dockerhub_ref" --format '{{.Manifest.Digest}}')"
+          platforms="${{ matrix.service.platforms || 'linux/amd64,linux/arm64' }}"
 
-          echo "GHCR digest:      $ghcr_digest"
-          echo "Docker Hub digest: $dockerhub_digest"
+          normalize_manifest() {
+            local ref="$1"
 
-          if [[ "$ghcr_digest" != "$dockerhub_digest" ]]; then
-            echo "Digest mismatch between GHCR and Docker Hub for ${{ matrix.service.name }}" >&2
+            docker buildx imagetools inspect "$ref" --format '{{json .Manifest.Manifests}}' \
+              | jq -r --arg platforms "$platforms" '
+                  ($platforms | split(",") | map(split("/") | {os: .[0], architecture: .[1]}) | INDEX(.os + "/" + .architecture)) as $wanted
+                  | map(select(.Platform != null))
+                  | map(select(.Platform.os != "unknown" and .Platform.architecture != "unknown"))
+                  | map(select($wanted[(.Platform.os + "/" + .Platform.architecture)] != null))
+                  | map({platform: (.Platform.os + "/" + .Platform.architecture), digest: .Digest})
+                  | sort_by(.platform)
+                  | .[]
+                  | "\(.platform)=\(.digest)"'
+          }
+
+          ghcr_manifest="$(normalize_manifest "$ghcr_ref")"
+          dockerhub_manifest="$(normalize_manifest "$dockerhub_ref")"
+
+          echo "Expected platforms: $platforms"
+          echo "GHCR platform digests:"
+          echo "$ghcr_manifest"
+          echo "Docker Hub platform digests:"
+          echo "$dockerhub_manifest"
+
+          if [[ -z "$ghcr_manifest" || -z "$dockerhub_manifest" ]]; then
+            echo "Unable to resolve runtime platform manifests for ${{ matrix.service.name }}" >&2
+            exit 1
+          fi
+
+          if [[ "$ghcr_manifest" != "$dockerhub_manifest" ]]; then
+            echo "Runtime platform digest mismatch between GHCR and Docker Hub for ${{ matrix.service.name }}" >&2
             exit 1
           fi
 
