@@ -14,6 +14,8 @@ Primary project documentation is maintained at **https://docs.sonicverse.eu**. T
 
 Please use [GitHub's private vulnerability reporting](https://github.com/sonicverse-eu/audiostreaming-stack/security/advisories/new) to disclose issues confidentially.
 
+This channel is for security vulnerabilities only. For conduct-related concerns, follow the reporting process in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
 Include the following in your report:
 - Description of the vulnerability
 - Steps to reproduce
