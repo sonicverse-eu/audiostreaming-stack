@@ -72,7 +72,7 @@ print_mode_info() {
     elif [ "$mode" = "local" ]; then
         echo -e "  ${BLUE}ℹ${NC}  Local build mode enabled — building containers locally"
     else
-        echo -e "  ${BLUE}ℹ${NC}  Minimal GHCR deployment (default) — using pre-built images"
+        echo -e "  ${BLUE}ℹ${NC}  Minimal Docker Hub deployment (default) — using pre-built images"
     fi
     echo ""
 }
@@ -116,13 +116,13 @@ Usage:
 Options:
   --dev              Install Node/Python dependencies for local development.
                      Required for: building dashboard, running analytics/API locally.
-                     Skip this if using GHCR pre-built images (recommended for deployment).
-  --build-local      Build container images locally instead of pulling from GHCR.
+                                         Skip this if using Docker Hub pre-built images (recommended for deployment).
+    --build-local      Build container images locally instead of pulling from Docker Hub.
                      Use this if you need to modify Dockerfile or container code.
   -h, --help         Show this help message.
 
 Deployment scenarios:
-  Minimal GHCR deployment (easiest, default):
+    Minimal Docker Hub deployment (easiest, default):
     $ ./install.sh
 
   Full development environment:
@@ -465,11 +465,11 @@ STEP_NUM=$((STEP_NUM + 1))
 step "$STEP_NUM" "Building containers"
 
 if [ "$USE_PREBUILT" = "true" ]; then
-    info "Pulling pre-built images from GHCR..."
+    info "Pulling pre-built images from Docker Hub..."
     echo ""
     docker compose pull || { error "Pull failed. Images may not exist yet. Run with --build-local to build locally instead."; exit 1; }
     echo ""
-    success "All images pulled from GHCR"
+    success "All images pulled from Docker Hub"
 else
     info "Building containers locally. This may take a few minutes on first run..."
     echo ""

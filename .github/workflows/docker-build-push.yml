@@ -8,6 +8,7 @@ on:
     branches: [main]
 
 env:
+  DOCKERHUB_NAMESPACE: sonicverse
   GHCR_IMAGE_BASE: ghcr.io/sonicverse-eu/audiostreaming-stack
 
 jobs:
@@ -108,7 +109,7 @@ jobs:
           set -e
           should_build=false
 
-              if [[ "${{ github.event_name }}" != 'pull_request' || \
+          if [[ "${{ github.event_name }}" != 'pull_request' || \
                 "${{ needs.changes.outputs.affects_all }}" == 'true' ]]; then
             should_build=true
           else
@@ -181,7 +182,7 @@ jobs:
         with:
           images: |
             ${{ env.GHCR_IMAGE_BASE }}/${{ matrix.service.name }}
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/audiostreaming-stack-${{ matrix.service.name }}
+            docker.io/${{ env.DOCKERHUB_NAMESPACE }}/audiostreaming-stack-${{ matrix.service.name }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -205,7 +206,7 @@ jobs:
       - name: Verify GHCR and Docker Hub digests match
         if: github.event_name != 'pull_request' && steps.should_build.outputs.value == 'true'
         env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_NAMESPACE }}
         run: |
           set -e
           short_sha="${GITHUB_SHA::7}"

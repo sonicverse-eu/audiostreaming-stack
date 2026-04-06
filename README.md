@@ -104,7 +104,7 @@ For the quickest setup with minimal typing:
 bash <(curl -fsSL https://sonicverse.short.gy/install-audiostack)
 ```
 
-This works from any directory and automatically handles cloning the repository, checking prerequisites, and configuring your stack. Equivalent to the "Minimal GHCR deployment" option below.
+This works from any directory and automatically handles cloning the repository, checking prerequisites, and configuring your stack. Equivalent to the "Minimal container-image deployment" option below.
 
 **Features:**
 - Works from any directory (automatic git clone)
@@ -132,6 +132,29 @@ This installs **only what's needed to run**:
 - Python / pip (analytics & API already built into image)
 
 **Time:** ~2–5 minutes (mostly downloading ~500MB of container images)
+
+### Container registries
+
+Pre-built service images are published to both registries:
+
+- **Primary (default): Docker Hub** under `sonicverse`.
+- **Mirror: GHCR** under `ghcr.io/sonicverse-eu/audiostreaming-stack`.
+
+Docker Hub image names:
+
+- `docker.io/sonicverse/audiostreaming-stack-icecast:latest`
+- `docker.io/sonicverse/audiostreaming-stack-liquidsoap:latest`
+- `docker.io/sonicverse/audiostreaming-stack-nginx:latest`
+- `docker.io/sonicverse/audiostreaming-stack-status-api:latest`
+- `docker.io/sonicverse/audiostreaming-stack-analytics:latest`
+
+GHCR mirror names:
+
+- `ghcr.io/sonicverse-eu/audiostreaming-stack/icecast:latest`
+- `ghcr.io/sonicverse-eu/audiostreaming-stack/liquidsoap:latest`
+- `ghcr.io/sonicverse-eu/audiostreaming-stack/nginx:latest`
+- `ghcr.io/sonicverse-eu/audiostreaming-stack/status-api:latest`
+- `ghcr.io/sonicverse-eu/audiostreaming-stack/analytics:latest`
 
 ### 📦 Full development environment
 
