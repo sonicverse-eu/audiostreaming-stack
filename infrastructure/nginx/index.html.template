@@ -113,10 +113,12 @@
             transition: all 0.2s ease;
         }
 
-        .endpoint-card:hover {
+        .endpoint-card:hover,
+        .endpoint-card:focus-visible {
             border-color: var(--accent-start);
             background-color: rgba(96, 165, 250, 0.04);
             transform: translateY(-2px);
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.28);
         }
 
         .endpoint-info h3 {
@@ -136,7 +138,8 @@
             transition: color 0.2s ease;
         }
 
-        .endpoint-card:hover svg {
+        .endpoint-card:hover svg,
+        .endpoint-card:focus-visible svg {
             color: var(--accent-start);
         }
 
