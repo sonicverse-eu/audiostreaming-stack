@@ -1,4 +1,5 @@
-FROM nginx:1.29.7-alpine3.23-slim
+FROM nginx:1.28.3-alpine-slim
+
 RUN apk add --no-cache gettext=0.24.1-r1
 
 COPY nginx.conf /etc/nginx/nginx.conf.template
