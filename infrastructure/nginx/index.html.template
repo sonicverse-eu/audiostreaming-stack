@@ -215,7 +215,7 @@
 
         <div class="section-title">Available Streams</div>
         <div class="endpoints-grid">
-            <a href="/listen/stream-mp3-128" class="endpoint-card" target="_blank">
+            <a href="/listen/stream-mp3-128" class="endpoint-card" target="_blank" rel="noopener noreferrer">
                 <div class="endpoint-info">
                     <h3>MP3 Stream (128kbps)</h3>
                     <p>Standard quality • High compatibility</p>
@@ -223,7 +223,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
             </a>
             
-            <a href="/hls/live.m3u8" class="endpoint-card" target="_blank">
+            <a href="/hls/live.m3u8" class="endpoint-card" target="_blank" rel="noopener noreferrer">
                 <div class="endpoint-info">
                     <h3>HLS Stream</h3>
                     <p>Adaptive bitrate • Modern web stream</p>
@@ -239,13 +239,13 @@
     </div>
 
     <div class="footer">
-        <div>&copy; <script>document.write(new Date().getFullYear())</script> <span style="font-weight: 600; color: var(--text-main);">Sonicverse</span>. Released under the <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a>.</div>
+        <div>&copy; <script>document.write(new Date().getFullYear())</script> <span style="font-weight: 600; color: var(--text-main);">Sonicverse</span>. Released under the <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener noreferrer">MIT License</a>.</div>
         <div class="footer-links">
-            <a href="https://docs.sonicverse.eu" target="_blank">
+            <a href="https://docs.sonicverse.eu" target="_blank" rel="noopener noreferrer">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
                 Documentation
             </a>
-            <a href="https://github.com/sonicverse-eu/audiostreaming-stack" target="_blank">
+            <a href="https://github.com/sonicverse-eu/audiostreaming-stack" target="_blank" rel="noopener noreferrer">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.03c3.18-.3 6.5-1.5 6.5-7.1a5.8 5.8 0 0 0-1.6-4.03 5.5 5.5 0 0 0-.15-4.5s-1.3-.4-4.3 1.6a14.88 14.88 0 0 0-8 0c-3-2-4.3-1.6-4.3-1.6a5.5 5.5 0 0 0-.15 4.5A5.8 5.8 0 0 0 2 10.77c0 5.6 3.3 6.8 6.5 7.1a4.8 4.8 0 0 0-1 3.03v4"/><path d="M9 20c-5 1.5-5-2.5-7-3"/></svg>
                 GitHub Repository
             </a>
