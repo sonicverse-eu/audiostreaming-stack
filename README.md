@@ -18,6 +18,8 @@ This repository README is a quick project overview. If local instructions differ
 
 Contributing to this project means following the [Code of Conduct](CODE_OF_CONDUCT.md).
 
+Project planning and task tracking currently live in GitHub Issues. When contributing work, link the relevant GitHub issue in your pull request whenever one exists.
+
 Join the Sonicverse OSS Slack for community support, implementation questions, and contributor collaboration.
 
 ## Architecture
