@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { Models } from "appwrite";
 import { account } from "./appwrite";
-import { apiFetch } from "./api";
+import { verifyApiAccess } from "./api";
 
 interface AuthContextType {
   user: Models.User<Models.Preferences> | null;
@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Verify team access via API
       try {
-        await apiFetch("status", jwtResp.jwt);
+        await verifyApiAccess(jwtResp.jwt);
       } catch (error) {
         if ((error as Error).message === "Unauthorized") {
           await account.deleteSession("current");
