@@ -45,5 +45,4 @@ MCP documentation: **https://docs.sonicverse.eu/mcp**
 
 - Update `README.md` when behavior or configuration changes.
 - Keep the PR template sections (Summary, Related issue) accurate and complete.
-- Pull requests must link to the correct related issue.
-- Reference the related issue when one exists.
+- Pull requests must link to the related issue when one exists.
