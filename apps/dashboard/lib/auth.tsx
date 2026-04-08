@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [jwt, setJwt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const authenticate = useCallback(async (): Promise<string | null> => {
+  const authenticate = useCallback(async (): Promise<string> => {
     try {
       const currentUser = await account.get();
       const jwtResp = await account.createJWT();
@@ -56,10 +56,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
       setJwt(jwtResp.jwt);
       return jwtResp.jwt;
-    } catch {
+    } catch (error) {
       setUser(null);
       setJwt(null);
-      return null;
+      throw error;
     }
   }, []);
 
@@ -70,12 +70,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(
     async (email: string, password: string) => {
       await account.createEmailPasswordSession(email, password);
-      const authenticatedJwt = await authenticate();
-      if (!authenticatedJwt) {
-        await account.deleteSession("current");
-        throw new Error(
-          "Access denied. You must be a member of the broadcast team."
-        );
+      try {
+        await authenticate();
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message ===
+            "Access denied. You must be a member of the broadcast team."
+        ) {
+          throw error;
+        }
+
+        throw error;
       }
     },
     [authenticate]

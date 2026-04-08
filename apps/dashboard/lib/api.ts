@@ -95,6 +95,7 @@ export async function apiPost<T>(
     headers,
     body: reqBody,
   });
+  if (res.status === 401) throw new Error("Unauthorized");
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
