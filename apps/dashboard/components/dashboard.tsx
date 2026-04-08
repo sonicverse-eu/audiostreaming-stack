@@ -3,15 +3,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import {
-  apiFetch,
-  apiPost,
-  type StreamStatus,
-  type StackConfig,
   type Alert,
+  type CommandsConfig,
   type Container,
   type EmergencyFile,
-  type CommandsConfig,
-  type CommandResult,
+  type StackConfig,
+  type StreamStatus,
+  deleteEmergencyAudio,
+  fetchAlerts,
+  fetchCommandsConfig,
+  fetchConfig,
+  fetchContainers,
+  fetchEmergencyAudio,
+  fetchStatus,
+  runCommandRequest,
+  uploadEmergencyAudio,
 } from "@/lib/api";
 import { Card } from "./card";
 import { StatusDot } from "./status-dot";
@@ -34,10 +40,10 @@ export function Dashboard() {
   const refresh = useCallback(async () => {
     if (!jwt) return;
     const [s, a, c, e] = await Promise.allSettled([
-      apiFetch<StreamStatus>("/api/status", jwt),
-      apiFetch<Alert[]>("/api/alerts", jwt),
-      apiFetch<Container[]>("/api/containers", jwt),
-      apiFetch<EmergencyFile[]>("/api/emergency-audio", jwt),
+      fetchStatus(jwt),
+      fetchAlerts(jwt),
+      fetchContainers(jwt),
+      fetchEmergencyAudio(jwt),
     ]);
     if (s.status === "fulfilled") setStatus(s.value);
     if (a.status === "fulfilled") setAlerts(a.value);
@@ -49,8 +55,8 @@ export function Dashboard() {
   // Load config once
   useEffect(() => {
     if (!jwt) return;
-    apiFetch<StackConfig>("/api/config", jwt).then(setConfig).catch(() => {});
-    apiFetch<CommandsConfig>("/api/commands", jwt).then(setCommandsConfig).catch(() => {});
+    fetchConfig(jwt).then(setConfig).catch(() => {});
+    fetchCommandsConfig(jwt).then(setCommandsConfig).catch(() => {});
   }, [jwt]);
 
   // Refresh loop
@@ -80,7 +86,7 @@ export function Dashboard() {
     try {
       const form = new FormData();
       form.append("file", file);
-      await apiPost("/api/emergency-audio/upload", jwt, form);
+      await uploadEmergencyAudio(jwt, form);
       setUploadStatus("Uploaded successfully");
       refresh();
     } catch {
@@ -93,7 +99,7 @@ export function Dashboard() {
   async function handleDelete(filename: string) {
     if (!jwt || !confirm(`Remove ${filename}? Stream will have no fallback.`))
       return;
-    await apiPost("/api/emergency-audio/delete", jwt, { filename });
+    await deleteEmergencyAudio(jwt, { filename });
     refresh();
   }
 
@@ -103,7 +109,7 @@ export function Dashboard() {
     setCmdRunning(key);
     setCmdOutput(null);
     try {
-      const result = await apiPost<CommandResult>("/api/commands/run", jwt, {
+      const result = await runCommandRequest(jwt, {
         command: commandId,
         service: service || "",
       });

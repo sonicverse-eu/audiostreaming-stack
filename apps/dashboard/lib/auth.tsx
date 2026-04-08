@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Models } from "appwrite";
 import { account } from "./appwrite";
+import { verifyApiAccess } from "./api";
 
 interface AuthContextType {
   user: Models.User<Models.Preferences> | null;
@@ -33,28 +34,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [jwt, setJwt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const authenticate = useCallback(async () => {
+  const authenticate = useCallback(async (): Promise<string> => {
     try {
       const currentUser = await account.get();
       const jwtResp = await account.createJWT();
 
       // Verify team access via API
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-      const res = await fetch(`${API_URL}/api/status`, {
-        headers: { Authorization: `Bearer ${jwtResp.jwt}` },
-      });
-      if (res.status === 401) {
-        await account.deleteSession("current");
-        throw new Error(
-          "Access denied. You must be a member of the broadcast team."
-        );
+      try {
+        await verifyApiAccess(jwtResp.jwt);
+      } catch (error) {
+        if ((error as Error).message === "Unauthorized") {
+          await account.deleteSession("current");
+          throw new Error(
+            "Access denied. You must be a member of the broadcast team."
+          );
+        }
+
+        throw error;
       }
 
       setUser(currentUser);
       setJwt(jwtResp.jwt);
-    } catch {
+      return jwtResp.jwt;
+    } catch (error) {
       setUser(null);
       setJwt(null);
+      throw error;
     }
   }, []);
 
@@ -65,14 +70,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(
     async (email: string, password: string) => {
       await account.createEmailPasswordSession(email, password);
-      await authenticate();
-      if (!jwt) {
-        throw new Error(
-          "Access denied. You must be a member of the broadcast team."
-        );
+      try {
+        await authenticate();
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message ===
+            "Access denied. You must be a member of the broadcast team."
+        ) {
+          throw error;
+        }
+
+        throw error;
       }
     },
-    [authenticate, jwt]
+    [authenticate]
   );
 
   const logout = useCallback(async () => {
