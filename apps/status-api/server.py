@@ -717,4 +717,4 @@ if __name__ == "__main__":
     port = int(os.getenv("STATUS_PANEL_PORT", "8080"))
     print(f"[status-api] Starting on port {port}")
     print(f"[status-api] Appwrite auth: {'enabled' if APPWRITE_ENDPOINT else 'disabled'}")
-    app.run(host="0.0.0.0", port=port)
+    app.run(host=os.getenv("STATUS_PANEL_HOST", "127.0.0.1"), port=port)
