@@ -139,6 +139,7 @@ export function Dashboard() {
         <div className="flex items-center gap-4">
           <span className="text-[#8b90a0] text-xs">{user?.email}</span>
           <button
+            type="button"
             onClick={logout}
             className="px-3 py-1.5 bg-[#22263a] border border-[#2a2e3d] rounded-md text-[#8b90a0] text-xs hover:text-[#e1e4ed] hover:border-[#8b90a0]"
           >
@@ -208,6 +209,7 @@ export function Dashboard() {
                   </div>
                   {canManageEmergencyAudio ? (
                     <button
+                      type="button"
                       onClick={() => handleDelete(f.filename)}
                       className="px-2 py-1 text-xs border border-red-400/50 text-red-400 rounded hover:bg-red-400/10"
                     >
@@ -394,9 +396,9 @@ export function Dashboard() {
             {alerts.length === 0 ? (
               <p className="text-sm text-[#8b90a0]">No alerts — all clear</p>
             ) : (
-              alerts.map((a, i) => (
+              alerts.map((a) => (
                 <div
-                  key={i}
+                  key={`${a.timestamp}-${a.type}-${a.message ?? ""}`}
                   className="flex items-start gap-2 py-2 border-b border-[#2a2e3d] text-xs last:border-0"
                 >
                   <span className="text-[#8b90a0] font-mono whitespace-nowrap">
@@ -429,6 +431,7 @@ export function Dashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
                 {commandsConfig.commands.filter(c => !c.requires_service).map((cmd) => (
                   <button
+                    type="button"
                     key={cmd.id}
                     onClick={() => runCommand(cmd.id, cmd.label)}
                     disabled={cmdRunning !== null}
@@ -465,6 +468,7 @@ export function Dashboard() {
                         {commandsConfig.commands.filter(c => c.requires_service).map(cmd => (
                           <td key={cmd.id} className="px-3 py-2">
                             <button
+                              type="button"
                               onClick={() => runCommand(cmd.id, cmd.label, svc)}
                               disabled={cmdRunning !== null}
                               className={`px-2 py-1 text-xs border rounded transition-colors ${
@@ -498,6 +502,7 @@ export function Dashboard() {
                   {" "}{cmdOutput.label}
                 </span>
                 <button
+                  type="button"
                   onClick={() => setCmdOutput(null)}
                   className="text-[#8b90a0] text-xs hover:text-[#e1e4ed]"
                 >
