@@ -9,7 +9,7 @@ on:
 jobs:
   codacy-coverage-reporter:
     name: Upload coverage to Codacy
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
 
@@ -40,7 +40,8 @@ jobs:
           seen_file="$(mktemp)"
 
           for pattern in "${patterns[@]}"; do
-              for report in $pattern; do
+              local_files=($pattern)
+              for report in "${local_files[@]}"; do
                   [[ -f "$report" ]] || continue
 
                   if ! grep -Fqx "$report" "$seen_file"; then
@@ -88,7 +89,7 @@ jobs:
         if: >-
           steps.coverage_reports.outputs.found == 'true' &&
           (secrets.CODACY_PROJECT_TOKEN != '' || secrets.CODACY_API_TOKEN != '')
-        uses: codacy/codacy-coverage-reporter-action@v1.3.0
+        uses: codacy/codacy-coverage-reporter-action@89d6c85cfafaec52c72b6c5e8b2878d33104c699 # v1.3.0
         with:
           project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
           api-token: ${{ secrets.CODACY_API_TOKEN }}
