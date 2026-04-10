@@ -10,12 +10,13 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, urlunsplit
 
 import requests
 
 # Configuration
-ICECAST_URL = os.getenv("ICECAST_URL", "http://icecast:8000")
+DEFAULT_ICECAST_URL = "icecast:8000"
+ICECAST_URL = os.getenv("ICECAST_URL", DEFAULT_ICECAST_URL)
 ICECAST_ADMIN_USER = os.getenv("ICECAST_ADMIN_USER", "admin")
 ICECAST_ADMIN_PASSWORD = os.getenv("ICECAST_ADMIN_PASSWORD", "changeme")
 POSTHOG_API_KEY = os.getenv("POSTHOG_API_KEY", "")
@@ -153,8 +154,6 @@ def handle_stream_outage(disconnected_mounts):
 
 def handle_harbor_state(harbor_name, is_up):
     """Track harbor connectivity and emit Pushover on disconnect transitions."""
-    global harbor_states
-
     if harbor_name not in harbor_states:
         harbor_states[harbor_name] = True
 
@@ -234,12 +233,12 @@ class AlertHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format, *args):
+    def log_message(self, *args, **kwargs):
         pass  # Suppress default request logging
 
 
 def start_webhook_server():
-    server = HTTPServer(("0.0.0.0", 8888), AlertHandler)
+    server = HTTPServer(("", 8888), AlertHandler)  # noqa: S104 - must accept requests from sibling containers
     print("[alerts] Webhook server listening on :8888")
     server.serve_forever()
 
@@ -248,11 +247,20 @@ def start_webhook_server():
 # Icecast stats polling → PostHog
 # ============================================================
 
+def get_icecast_base_url():
+    """Return the Icecast endpoint, defaulting to the internal service over HTTP."""
+    parsed = urlparse(ICECAST_URL)
+    if parsed.scheme:
+        return ICECAST_URL.rstrip("/")
+
+    return urlunsplit(("http", ICECAST_URL, "", "", "")).rstrip("/")
+
+
 def fetch_icecast_stats():
     """Fetch stats from Icecast status-json.xsl endpoint."""
     try:
         resp = requests.get(
-            f"{ICECAST_URL}/status-json.xsl",
+            f"{get_icecast_base_url()}/status-json.xsl",
             auth=(ICECAST_ADMIN_USER, ICECAST_ADMIN_PASSWORD),
             timeout=10,
         )

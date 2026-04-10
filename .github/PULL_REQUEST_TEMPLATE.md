@@ -4,6 +4,6 @@
 
 <!-- Primary documentation source: https://docs.sonicverse.eu -->
 
-## Related issue
+## Related GitHub issue
 
 Closes #

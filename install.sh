@@ -25,12 +25,10 @@ read -t 0 _ 2>/dev/null && STDIN_AVAILABLE=true || STDIN_AVAILABLE=false
 
 if [[ "$STDIN_AVAILABLE" == "true" || -f "docker-compose.yml" ]]; then
     # stdin is available (interactive) OR we're already in the repo directory
-    RUNNING_LOCALLY=true
     WORK_DIR="$(pwd)"
 else
     # stdin is piped (from curl), and not in repo directory
-    RUNNING_LOCALLY=false
-    
+
     # Define minimal info/error for remote setup
     _info() { echo -e "  ${BLUE}ℹ${NC}  $1"; }
     _error() { echo -e "  ${RED}✗${NC}  $1"; }
@@ -103,7 +101,7 @@ prompt_secret() {
 
 generate_password() {
     openssl rand -base64 16 2>/dev/null | tr -dc 'a-zA-Z0-9' | head -c 20 || \
-    cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | head -c 20
+    LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 20
 }
 
 usage() {
@@ -173,9 +171,7 @@ fi
 # ----------------------------------------------------------
 # Detect existing installation
 # ----------------------------------------------------------
-EXISTING_STACK=false
 if docker compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
-    EXISTING_STACK=true
     echo ""
     warn "Existing streaming stack detected!"
     echo ""

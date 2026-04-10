@@ -4,6 +4,8 @@ Thank you for your interest in contributing. This document covers how to get sta
 
 Primary documentation lives at **https://docs.sonicverse.eu**. Use it as the canonical source for setup and operational guidance.
 
+Task tracking for this repository uses GitHub Issues. Prefer opening or linking a GitHub issue for bugs, feature work, and follow-up tasks so PRs stay connected to the active record of work.
+
 ## Code of Conduct
 
 This project follows [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). By participating, you agree to follow its expectations for respectful and constructive collaboration.
@@ -73,7 +75,7 @@ This installs Node/Python dependencies and walks you through stack configuration
 2. Make your changes; keep each PR focused on a single feature or fix
 3. Run linters locally before pushing
 4. Fill in the pull request template completely
-5. Reference any related issue with `Closes #123`
+5. Reference any related GitHub issue with `Closes #123`
 
 ## Adding Environment Variables
 
@@ -83,7 +85,7 @@ If your change introduces new environment variables:
 
 ## Reporting Bugs
 
-Use the **Bug report** issue template. Include your OS, Docker version, and relevant logs (`docker compose logs --tail=50 <service>`).
+Use the **Bug report** GitHub Issue template. Include your OS, Docker version, and relevant logs (`docker compose logs --tail=50 <service>`).
 
 For behavioral or conduct concerns, report through the process in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
