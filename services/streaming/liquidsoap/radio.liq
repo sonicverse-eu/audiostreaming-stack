@@ -29,12 +29,12 @@ primary = input.harbor(
 
 primary.on_connect(synchronous=false, fun (_) -> begin
   log("OK: Primary harbor connected")
-  ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=harbor_primary_up'"))
+  ignore(process.run("wget -q -O /dev/null --post-data='type=harbor_primary_up' 'http://analytics:8888/alert'"))
 end)
 
 primary.on_disconnect(synchronous=false, fun () -> begin
   log("ALERT: Primary harbor disconnected")
-  ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=harbor_primary_down'"))
+  ignore(process.run("wget -q -O /dev/null --post-data='type=harbor_primary_down' 'http://analytics:8888/alert'"))
 end)
 
 # Fallback: lower bitrate Ogg stream
@@ -48,12 +48,12 @@ secondary = input.harbor(
 
 secondary.on_connect(synchronous=false, fun (_) -> begin
   log("OK: Secondary harbor connected")
-  ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=harbor_secondary_up'"))
+  ignore(process.run("wget -q -O /dev/null --post-data='type=harbor_secondary_up' 'http://analytics:8888/alert'"))
 end)
 
 secondary.on_disconnect(synchronous=false, fun () -> begin
   log("ALERT: Secondary harbor disconnected")
-  ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=harbor_secondary_down'"))
+  ignore(process.run("wget -q -O /dev/null --post-data='type=harbor_secondary_down' 'http://analytics:8888/alert'"))
 end)
 
 # --- Emergency fallback ---
@@ -91,12 +91,12 @@ radio = blank.detect(
 
 radio.on_blank(synchronous=false, fun () -> begin
   log("ALERT: Silence detected for #{silence_duration}s (threshold: #{silence_threshold}dB)")
-  ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=silence_start'"))
+  ignore(process.run("wget -q -O /dev/null --post-data='type=silence_start' 'http://analytics:8888/alert'"))
 end)
 
 radio.on_noise(synchronous=false, fun () -> begin
   log("OK: Audio resumed after silence")
-  ignore(process.run("wget -q -O /dev/null 'http://analytics:8888/alert?type=silence_end'"))
+  ignore(process.run("wget -q -O /dev/null --post-data='type=silence_end' 'http://analytics:8888/alert'"))
 end)
 
 # --- Icecast outputs (multiple bitrates/formats) ---

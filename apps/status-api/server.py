@@ -291,7 +291,7 @@ def api_auth_config():
     })
 
 
-@app.route("/api/alert", methods=["POST", "GET"])
+@app.route("/api/alert", methods=["POST"])
 def api_alert():
     """Receive alerts from the analytics service or Liquidsoap (internal only).
     Only accepts requests from Docker internal network (non-routable IPs)."""
@@ -302,8 +302,22 @@ def api_alert():
         return Response(json.dumps({"error": "Forbidden"}), 403,
                         {"Content-Type": "application/json"})
 
-    alert_type = request.args.get("type", "unknown")
-    message = request.args.get("message", "")
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+
+    alert_type = (
+        payload.get("type")
+        or request.form.get("type")
+        or request.args.get("type")
+        or "unknown"
+    )
+    message = (
+        payload.get("message")
+        or request.form.get("message")
+        or request.args.get("message")
+        or ""
+    )
 
     alert = {
         "type": alert_type,

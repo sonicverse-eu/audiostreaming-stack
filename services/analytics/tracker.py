@@ -5,6 +5,7 @@ Polls Icecast stats endpoint and sends listener metrics to PostHog.
 Receives silence detection webhooks from Liquidsoap and sends Pushover alerts.
 """
 
+import json
 import os
 import sys
 import threading
@@ -218,14 +219,42 @@ def handle_alert(alert_type):
 # ============================================================
 
 class AlertHandler(BaseHTTPRequestHandler):
+    def parse_alert_type(self):
+        parsed = urlparse(self.path)
+        if parsed.path != "/alert":
+            return None
+
+        params = parse_qs(parsed.query)
+        alert_type = params.get("type", [""])[0]
+        if alert_type:
+            return alert_type
+
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        body = self.rfile.read(length) if length > 0 else b""
+        if not body:
+            return "unknown"
+
+        content_type = self.headers.get("Content-Type", "")
+        if "application/json" in content_type:
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                return "unknown"
+            if isinstance(payload, dict):
+                return str(payload.get("type", "unknown"))
+            return "unknown"
+
+        try:
+            params = parse_qs(body.decode("utf-8"))
+        except UnicodeDecodeError:
+            return "unknown"
+        return params.get("type", ["unknown"])[0]
+
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path == "/alert":
-            params = parse_qs(parsed.query)
-            alert_type = params.get("type", ["unknown"])[0]
-            print(f"[alerts] Received alert: {alert_type}")
-            handle_alert(alert_type)
-            self.send_response(200)
+            self.send_response(405)
+            self.send_header("Allow", "POST")
             self.end_headers()
         elif parsed.path == "/health":
             self.send_response(200)
@@ -233,6 +262,18 @@ class AlertHandler(BaseHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+    def do_POST(self):
+        alert_type = self.parse_alert_type()
+        if alert_type is None:
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        print(f"[alerts] Received alert: {alert_type}")
+        handle_alert(alert_type)
+        self.send_response(200)
+        self.end_headers()
 
     def log_message(self, format, *args):
         pass  # Suppress default request logging
