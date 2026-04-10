@@ -23,7 +23,7 @@ NC='\033[0m'
 # clone the repository first and recursively call the cloned script.
 read -t 0 _ 2>/dev/null && STDIN_AVAILABLE=true || STDIN_AVAILABLE=false
 
-if [ "$STDIN_AVAILABLE" = "true" ] || [ -f "docker-compose.yml" ]; then
+if [[ "$STDIN_AVAILABLE" == "true" || -f "docker-compose.yml" ]]; then
     # stdin is available (interactive) OR we're already in the repo directory
     WORK_DIR="$(pwd)"
 else
@@ -65,9 +65,9 @@ print_banner() {
 
 print_mode_info() {
     local mode="$1"
-    if [ "$mode" = "dev" ]; then
+    if [[ "$mode" == "dev" ]]; then
         echo -e "  ${BLUE}ℹ${NC}  Development mode enabled — installing Node/Python dependencies"
-    elif [ "$mode" = "local" ]; then
+    elif [[ "$mode" == "local" ]]; then
         echo -e "  ${BLUE}ℹ${NC}  Local build mode enabled — building containers locally"
     else
         echo -e "  ${BLUE}ℹ${NC}  Minimal Docker Hub deployment (default) — using pre-built images"
@@ -83,7 +83,7 @@ step()    { echo -e "\n${BOLD}[$1/$TOTAL_STEPS] $2${NC}"; }
 
 prompt() {
     local var_name="$1" prompt_text="$2" default="$3"
-    if [ -n "$default" ]; then
+    if [[ -n "$default" ]]; then
         read -rp "  → $prompt_text [$default]: " value
         eval "$var_name=\"${value:-$default}\""
     else
@@ -152,7 +152,7 @@ done
 
 # Adjust total steps based on whether we're installing dev dependencies
 TOTAL_STEPS=6
-if [ "$DEV_MODE" = "true" ]; then
+if [[ "$DEV_MODE" == "true" ]]; then
     TOTAL_STEPS=7
 fi
 
@@ -160,9 +160,9 @@ fi
 
 print_banner
 
-if [ "$DEV_MODE" = "true" ]; then
+if [[ "$DEV_MODE" == "true" ]]; then
     print_mode_info "dev"
-elif [ "$USE_PREBUILT" = "false" ]; then
+elif [[ "$USE_PREBUILT" == "false" ]]; then
     print_mode_info "local"
 else
     print_mode_info "ghcr"
@@ -193,13 +193,13 @@ if docker compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
             backup_count=0
             for service in $(docker compose config --services 2>/dev/null || true); do
                 container_id="$(docker compose ps -q "$service" 2>/dev/null || true)"
-                if [ -z "$container_id" ]; then
+                if [[ -z "$container_id" ]]; then
                     continue
                 fi
 
                 original_image="$(docker inspect --format '{{.Config.Image}}' "$container_id" 2>/dev/null || true)"
                 current_image_id="$(docker inspect --format '{{.Image}}' "$container_id" 2>/dev/null || true)"
-                if [ -z "$original_image" ] || [ -z "$current_image_id" ]; then
+                if [[ -z "$original_image" || -z "$current_image_id" ]]; then
                     continue
                 fi
 
@@ -223,10 +223,10 @@ if docker compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
             info "Applying updates with zero downtime..."
             if ! docker compose up -d --remove-orphans; then
                 error "Failed to update stack. Rolling back..."
-                if [ -s "$backup_file" ]; then
+                if [[ -s "$backup_file" ]]; then
                     info "Restoring previously running images..."
                     while IFS='|' read -r original_image backup_image; do
-                        if [ -n "$original_image" ] && [ -n "$backup_image" ] && docker image inspect "$backup_image" >/dev/null 2>&1; then
+                        if [[ -n "$original_image" && -n "$backup_image" ]] && docker image inspect "$backup_image" >/dev/null 2>&1; then
                             docker tag "$backup_image" "$original_image" || true
                         fi
                     done < "$backup_file"
@@ -337,7 +337,7 @@ fi
 # ----------------------------------------------------------
 step 2 "Configuring environment"
 
-if [ -f .env ]; then
+if [[ -f .env ]]; then
     warn ".env file already exists."
     read -rp "  → Overwrite with fresh configuration? (y/N): " overwrite
     if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
@@ -346,7 +346,7 @@ if [ -f .env ]; then
     fi
 fi
 
-if [ "${SKIP_ENV}" != "true" ]; then
+if [[ "${SKIP_ENV}" != "true" ]]; then
     echo ""
     info "Let's configure your streaming stack."
     echo ""
@@ -392,6 +392,15 @@ if [ "${SKIP_ENV}" != "true" ]; then
     prompt APPWRITE_ENDPOINT   "Appwrite endpoint" "https://cloud.appwrite.io/v1"
     prompt APPWRITE_PROJECT_ID "Appwrite project ID" ""
     prompt APPWRITE_TEAM_ID    "Appwrite team ID (members get panel access)" ""
+    if [[ -n "${APPWRITE_PROJECT_ID}" && -z "${APPWRITE_TEAM_ID}" ]]; then
+        warn "APPWRITE_TEAM_ID is required when APPWRITE_PROJECT_ID is set."
+        while [[ -z "${APPWRITE_TEAM_ID}" ]]; do
+            prompt APPWRITE_TEAM_ID "Appwrite team ID (required for panel access)" ""
+            if [[ -z "${APPWRITE_TEAM_ID}" ]]; then
+                warn "Team ID cannot be empty while Appwrite panel auth is enabled."
+            fi
+        done
+    fi
     prompt STATUS_PANEL_CORS_ORIGIN "Status panel frontend URL(s) for CORS" "https://status.example.com"
     prompt STATUS_PANEL_WRITE_ROLES "Operator roles for writes (comma-separated)" "owner,admin"
     prompt STATUS_PANEL_ALLOW_RISKY_COMMANDS "Allow destructive panel commands? (0/1)" "0"
@@ -458,12 +467,12 @@ fi
 # Step 3: Install development dependencies (optional)
 # ----------------------------------------------------------
 STEP_NUM=3
-if [ "$DEV_MODE" = "true" ]; then
+if [[ "$DEV_MODE" == "true" ]]; then
     step "$STEP_NUM" "Installing development dependencies"
     echo ""
     info "Installing Node.js and Python dependencies..."
     echo ""
-    if [ -f "install-all.sh" ]; then
+    if [[ -f "install-all.sh" ]]; then
         bash ./install-all.sh
         success "Development dependencies installed"
     else
@@ -486,7 +495,7 @@ else
     warn "No fallback audio file found in emergency-audio/"
     echo ""
     read -rp "  → Path to fallback audio file (or press Enter to skip): " fallback_path
-    if [ -n "$fallback_path" ] && [ -f "$fallback_path" ]; then
+    if [[ -n "$fallback_path" && -f "$fallback_path" ]]; then
         cp "$fallback_path" emergency-audio/fallback.mp3
         success "Copied to emergency-audio/fallback.mp3"
     else
@@ -502,7 +511,7 @@ STEP_NUM=$((STEP_NUM + 1))
 # ----------------------------------------------------------
 step "$STEP_NUM" "Building containers"
 
-if [ "$USE_PREBUILT" = "true" ]; then
+if [[ "$USE_PREBUILT" == "true" ]]; then
     info "Pulling pre-built images from Docker Hub or configured registry..."
     echo ""
     docker compose pull || { error "Pull failed. Images may not exist yet. Run with --build-local to build locally instead."; exit 1; }
@@ -528,9 +537,9 @@ step "$STEP_NUM" "SSL certificate"
 source .env 2>/dev/null || true
 
 # Check for stale/invalid cert (e.g. from a failed previous run)
-if [ -f "certbot/conf/live/${ICECAST_HOSTNAME}/fullchain.pem" ]; then
+if [[ -f "certbot/conf/live/${ICECAST_HOSTNAME}/fullchain.pem" ]]; then
     CERT_SIZE=$(wc -c < "certbot/conf/live/${ICECAST_HOSTNAME}/fullchain.pem" 2>/dev/null || echo 0)
-    if [ "$CERT_SIZE" -lt 1500 ]; then
+    if [[ "$CERT_SIZE" -lt 1500 ]]; then
         warn "Found a possibly invalid/stale certificate (${CERT_SIZE} bytes). Removing it..."
         rm -rf "certbot/conf/live/${ICECAST_HOSTNAME}"
         rm -rf "certbot/conf/archive/${ICECAST_HOSTNAME}"
@@ -539,7 +548,7 @@ if [ -f "certbot/conf/live/${ICECAST_HOSTNAME}/fullchain.pem" ]; then
     fi
 fi
 
-if [ -f "certbot/conf/live/${ICECAST_HOSTNAME}/fullchain.pem" ]; then
+if [[ -f "certbot/conf/live/${ICECAST_HOSTNAME}/fullchain.pem" ]]; then
     success "SSL certificate already exists for ${ICECAST_HOSTNAME}"
 else
     echo ""

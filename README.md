@@ -251,9 +251,9 @@ Or for both local build and development dependencies:
    - Fallback: `lame.exe -r -s 44.1 -b 192 -x - -`
 
 6. **Verify**
-   - Icecast admin: `http://<host>/icecast-admin/`
-   - Test stream: `http://<host>/listen/stream-mp3-128` in VLC
-   - HLS: `http://<host>/hls/live.m3u8` in Safari/VLC
+   - Icecast admin: `https://<host>/icecast-admin/`
+   - Test stream: `https://<host>/listen/stream-mp3-128` in VLC
+   - HLS: `https://<host>/hls/live.m3u8` in Safari/VLC
 
 ## Install Development Dependencies Separately
 
@@ -362,9 +362,9 @@ All settings are managed via `.env` (copy from `.env.example`):
 | `SILENCE_DURATION` | Seconds of silence before alerting (default: `15`) |
 | `APPWRITE_ENDPOINT` | Appwrite API endpoint |
 | `APPWRITE_PROJECT_ID` | Appwrite project ID |
-| `APPWRITE_TEAM_ID` | Appwrite team ID (only members get panel access) |
+| `APPWRITE_TEAM_ID` | Appwrite team ID (required when `APPWRITE_PROJECT_ID` is set; only members get panel access) |
 | `STATUS_PANEL_CORS_ORIGIN` | Status dashboard URL(s) for CORS, comma-separated (e.g. `https://status.example.com`) |
-| `STATUS_PANEL_HOST` | Host interface for the standalone Flask dev server (default: `127.0.0.1`) |
+| `STATUS_PANEL_HOST` | Optional bind host for status API (default: `127.0.0.1`; auto-uses container IP in Docker when unset) |
 | `STATUS_PANEL_WRITE_ROLES` | Appwrite team roles allowed to manage emergency audio (default: `owner,admin`) |
 | `STATUS_PANEL_ALLOW_RISKY_COMMANDS` | Enable remote restart/SSL renewal commands (`0` by default) |
 | `POSTHOG_API_KEY` | PostHog project API key |
@@ -393,7 +393,7 @@ npm install && npm run build
 # Deploy the out/ directory to Appwrite Sites
 ```
 
-The API backend runs in the Docker stack and is proxied through nginx at `/api/`.
+The API backend runs in the Docker stack and is proxied through nginx at `https://<host>/api/`.
 
 ## Analytics & Alerts
 
@@ -485,6 +485,18 @@ To reduce CI time and avoid unnecessary jobs, pull request checks are scoped by 
    - Builds only the services whose directories changed: `services/streaming/icecast/**`, `services/streaming/liquidsoap/**`, `infrastructure/nginx/**`, `apps/status-api/**`, `services/analytics/**`.
    - Builds all services when `docker-compose.yml` changes.
 - Pushes to `main` and release tags keep full coverage (no PR path filtering) for safety.
+
+### SonarQube Cloud automatic analysis
+
+This repository includes a `.sonarcloud.properties` file for SonarQube Cloud automatic analysis. It excludes the repository's bootstrap and host-administration shell scripts from analysis:
+
+- `install.sh`
+- `install-all.sh`
+- `install-dev-deps.sh`
+- `init-letsencrypt.sh`
+- `setup-firewall.sh`
+
+These scripts run in operator-controlled environments rather than the deployed application runtime, so excluding them keeps SonarQube Cloud focused on the services and app code that ship with the stack. If you need finer-grained rule suppression than file-level exclusions, configure that in the SonarQube Cloud project UI.
 
 ### Mirror Issue Labels — maintenance notes
 

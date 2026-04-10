@@ -10,17 +10,17 @@
 set -e
 
 # Load .env
-if [ -f .env ]; then
+if [[ -f .env ]]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
-if [ -z "$ICECAST_HOSTNAME" ]; then
+if [[ -z "$ICECAST_HOSTNAME" ]]; then
     echo "Error: ICECAST_HOSTNAME not set in .env"
     exit 1
 fi
 
 # Check if cert already exists
-if [ -f "certbot/conf/live/$ICECAST_HOSTNAME/fullchain.pem" ]; then
+if [[ -f "certbot/conf/live/$ICECAST_HOSTNAME/fullchain.pem" ]]; then
     echo "Certificate already exists for $ICECAST_HOSTNAME"
     read -rp "Renew/replace it? (y/N): " renew
     if [[ ! "$renew" =~ ^[Yy]$ ]]; then
@@ -38,14 +38,14 @@ EMAIL="${LETSENCRYPT_EMAIL:-}"
 STAGING="${LETSENCRYPT_STAGING:-0}"
 
 EMAIL_ARG=""
-if [ -n "$EMAIL" ]; then
+if [[ -n "$EMAIL" ]]; then
     EMAIL_ARG="--email $EMAIL"
 else
     EMAIL_ARG="--register-unsafely-without-email"
 fi
 
 STAGING_ARG=""
-if [ "$STAGING" = "1" ]; then
+if [[ "$STAGING" == "1" ]]; then
     STAGING_ARG="--staging"
     echo "Using Let's Encrypt staging environment (test certificates)"
 fi
