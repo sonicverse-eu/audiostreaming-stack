@@ -8,6 +8,7 @@ Protected by Appwrite authentication.
 
 import functools
 import glob as globmod
+import ipaddress
 import json
 import os
 import shutil
@@ -43,6 +44,7 @@ STATION_NAME = os.getenv("STATION_NAME", "Radio Station")
 APPWRITE_ENDPOINT = os.getenv("APPWRITE_ENDPOINT", "")
 APPWRITE_PROJECT_ID = os.getenv("APPWRITE_PROJECT_ID", "")
 APPWRITE_TEAM_ID = os.getenv("APPWRITE_TEAM_ID", "")
+APPWRITE_AUTH_CONFIGURED = bool(APPWRITE_ENDPOINT and APPWRITE_PROJECT_ID and APPWRITE_TEAM_ID)
 WRITE_ROLES = {
     role.strip()
     for role in os.getenv("STATUS_PANEL_WRITE_ROLES", "owner,admin").split(",")
@@ -78,7 +80,7 @@ def extract_list_items(payload):
 
 def get_appwrite_context(jwt):
     """Verify an Appwrite JWT and collect team roles for the current user."""
-    if not APPWRITE_ENDPOINT or not APPWRITE_PROJECT_ID:
+    if not APPWRITE_AUTH_CONFIGURED:
         return None
 
     headers = {
@@ -101,34 +103,29 @@ def get_appwrite_context(jwt):
         if not user_id:
             return None
 
-        # If a team ID is configured, verify membership
-        if APPWRITE_TEAM_ID:
-            teams_resp = requests.get(
-                f"{APPWRITE_ENDPOINT}/teams/{APPWRITE_TEAM_ID}/memberships",
-                headers=headers,
-                timeout=5,
-            )
-            if teams_resp.status_code != 200:
-                return None
+        teams_resp = requests.get(
+            f"{APPWRITE_ENDPOINT}/teams/{APPWRITE_TEAM_ID}/memberships",
+            headers=headers,
+            timeout=5,
+        )
+        if teams_resp.status_code != 200:
+            return None
 
-            memberships = extract_list_items(teams_resp.json())
-            roles = set()
-            for membership in memberships:
-                if not isinstance(membership, dict):
-                    continue
-                if membership.get("userId") != user_id:
-                    continue
+        memberships = extract_list_items(teams_resp.json())
+        roles = set()
+        for membership in memberships:
+            if not isinstance(membership, dict):
+                continue
+            if membership.get("userId") != user_id:
+                continue
 
-                membership_roles = membership.get("roles") or []
-                if isinstance(membership_roles, list):
-                    roles.update(str(role) for role in membership_roles if role)
-                break
+            membership_roles = membership.get("roles") or []
+            if isinstance(membership_roles, list):
+                roles.update(str(role) for role in membership_roles if role)
+            break
 
-            if not roles:
-                return None
-
-        else:
-            roles = set()
+        if not roles:
+            return None
 
         return {
             "user_id": user_id,
@@ -157,10 +154,28 @@ def get_request_appwrite_context():
 
 
 def has_operator_access(context):
-    if not context or not APPWRITE_TEAM_ID:
+    if not context:
         return False
 
     return bool(context.get("roles", set()) & WRITE_ROLES)
+
+
+def get_originating_ip():
+    # Nginx appends the real client IP to X-Forwarded-For via $proxy_add_x_forwarded_for.
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        parts = [part.strip() for part in xff.split(",") if part.strip()]
+        if parts:
+            return parts[-1]
+    return request.remote_addr or ""
+
+
+def is_private_or_loopback_ip(ip_addr):
+    try:
+        parsed = ipaddress.ip_address(ip_addr)
+    except ValueError:
+        return False
+    return parsed.is_private or parsed.is_loopback
 
 
 def require_auth(f):
@@ -295,10 +310,12 @@ def api_auth_config():
 def api_alert():
     """Receive alerts from the analytics service or Liquidsoap (internal only).
     Only accepts requests from Docker internal network (non-routable IPs)."""
-    remote_ip = request.remote_addr or ""
-    # Allow Docker bridge network (172.x), localhost, and private ranges
-    if not (remote_ip.startswith("172.") or remote_ip.startswith("10.") or
-            remote_ip.startswith("192.168.") or remote_ip in ("127.0.0.1", "::1")):
+    if request.headers.get("X-Internal-Alert") == "1":
+        trusted_proxy = True
+    else:
+        trusted_proxy = is_private_or_loopback_ip(get_originating_ip())
+
+    if not trusted_proxy:
         return Response(json.dumps({"error": "Forbidden"}), 403,
                         {"Content-Type": "application/json"})
 
@@ -716,5 +733,8 @@ def api_commands_run():
 if __name__ == "__main__":
     port = int(os.getenv("STATUS_PANEL_PORT", "8080"))
     print(f"[status-api] Starting on port {port}")
-    print(f"[status-api] Appwrite auth: {'enabled' if APPWRITE_ENDPOINT else 'disabled'}")
+    if APPWRITE_PROJECT_ID and not APPWRITE_AUTH_CONFIGURED:
+        print("[status-api] Appwrite auth: disabled (set APPWRITE_TEAM_ID to enable access)")
+    else:
+        print(f"[status-api] Appwrite auth: {'enabled' if APPWRITE_AUTH_CONFIGURED else 'disabled'}")
     app.run(host="0.0.0.0", port=port)

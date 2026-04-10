@@ -396,6 +396,15 @@ if [[ "${SKIP_ENV}" != "true" ]]; then
     prompt APPWRITE_ENDPOINT   "Appwrite endpoint" "https://cloud.appwrite.io/v1"
     prompt APPWRITE_PROJECT_ID "Appwrite project ID" ""
     prompt APPWRITE_TEAM_ID    "Appwrite team ID (members get panel access)" ""
+    if [[ -n "${APPWRITE_PROJECT_ID}" && -z "${APPWRITE_TEAM_ID}" ]]; then
+        warn "APPWRITE_TEAM_ID is required when APPWRITE_PROJECT_ID is set."
+        while [[ -z "${APPWRITE_TEAM_ID}" ]]; do
+            prompt APPWRITE_TEAM_ID "Appwrite team ID (required for panel access)" ""
+            if [[ -z "${APPWRITE_TEAM_ID}" ]]; then
+                warn "Team ID cannot be empty while Appwrite panel auth is enabled."
+            fi
+        done
+    fi
     prompt STATUS_PANEL_CORS_ORIGIN "Status panel frontend URL(s) for CORS" "https://status.example.com"
     prompt STATUS_PANEL_WRITE_ROLES "Operator roles for writes (comma-separated)" "owner,admin"
     prompt STATUS_PANEL_ALLOW_RISKY_COMMANDS "Allow destructive panel commands? (0/1)" "0"
