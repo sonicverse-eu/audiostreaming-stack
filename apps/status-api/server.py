@@ -473,7 +473,11 @@ def api_emergency_audio_delete():
     if ext not in ALLOWED_AUDIO_EXTENSIONS:
         return jsonify({"error": "Invalid file type"}), 400
 
-    filepath = os.path.join(EMERGENCY_AUDIO_DIR, filename)
+    base_dir = os.path.realpath(EMERGENCY_AUDIO_DIR)
+    filepath = os.path.realpath(os.path.join(base_dir, filename))
+    if os.path.commonpath([base_dir, filepath]) != base_dir:
+        return jsonify({"error": "Invalid filename"}), 400
+
     if not os.path.exists(filepath):
         return jsonify({"error": "File not found"}), 404
 
