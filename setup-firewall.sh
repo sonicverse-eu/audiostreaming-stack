@@ -24,7 +24,7 @@ warn()    { echo -e "  ${YELLOW}!${NC}  $1"; }
 error()   { echo -e "  ${RED}✗${NC}  $1"; }
 
 # Check root
-if [ "$EUID" -ne 0 ]; then
+if [[ "$EUID" -ne 0 ]]; then
     error "This script must be run as root (sudo ./setup-firewall.sh)"
     exit 1
 fi
@@ -67,7 +67,7 @@ ufw allow 443/tcp >/dev/null 2>&1
 success "HTTPS (port 443) allowed"
 
 # Studio source ports
-if [ -n "$STUDIO_IP" ]; then
+if [[ -n "$STUDIO_IP" ]]; then
     info "Restricting studio ports to ${STUDIO_IP}..."
     ufw allow from "$STUDIO_IP" to any port 8010 proto tcp >/dev/null 2>&1
     success "Port 8010 (FLAC) allowed from ${STUDIO_IP} only"
