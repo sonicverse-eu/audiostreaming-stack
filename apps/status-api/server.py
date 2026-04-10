@@ -12,6 +12,7 @@ import ipaddress
 import json
 import os
 import shutil
+import socket
 import time
 from collections import deque
 
@@ -176,6 +177,23 @@ def is_private_or_loopback_ip(ip_addr):
     except ValueError:
         return False
     return parsed.is_private or parsed.is_loopback
+
+
+def get_bind_host():
+    configured_host = os.getenv("STATUS_PANEL_HOST", "").strip() or os.getenv(
+        "STATUS_PANEL_BIND_HOST",
+        "",
+    ).strip()
+    if configured_host:
+        return configured_host
+
+    if os.path.exists("/.dockerenv"):
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except socket.gaierror:
+            pass
+
+    return "127.0.0.1"
 
 
 def require_auth(f):
@@ -735,10 +753,11 @@ def api_commands_run():
 # ============================================================
 
 if __name__ == "__main__":
+    bind_host = get_bind_host()
     port = int(os.getenv("STATUS_PANEL_PORT", "8080"))
-    print(f"[status-api] Starting on port {port}")
+    print(f"[status-api] Starting on {bind_host}:{port}")
     if APPWRITE_PROJECT_ID and not APPWRITE_AUTH_CONFIGURED:
         print("[status-api] Appwrite auth: disabled (set APPWRITE_TEAM_ID to enable access)")
     else:
         print(f"[status-api] Appwrite auth: {'enabled' if APPWRITE_AUTH_CONFIGURED else 'disabled'}")
-    app.run(host="0.0.0.0", port=port)
+    app.run(host=bind_host, port=port)
