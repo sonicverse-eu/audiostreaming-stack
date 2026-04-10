@@ -463,7 +463,6 @@ Alerts have a 5-minute cooldown to prevent spam.
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | **Lint** | Push / PR to `main` | Runs component-aware checks: Ruff (Python), ESLint (TypeScript), hadolint (Dockerfiles), yamllint (YAML) |
-| **Codacy Coverage Reporter** | Push / PR to `main` | Uploads discovered coverage reports to Codacy when a Codacy token is configured |
 | **TruffleHog Secret Scan** | Push / PR to `main` | Scans commit history for verified leaked secrets using TruffleHog's CLI flags |
 | **Docker Build & Push** | Push / PR to `main`, tags `v*.*.*` | Builds service images and publishes to GHCR + Docker Hub; on PRs, only changed services are built |
 | **AI Autolabel Issues** | Issue opened / edited / reopened | Applies `Type:`, `Scope:`, and `Priority:` labels via GitHub Models (GPT-4o-mini) |
@@ -486,35 +485,6 @@ To reduce CI time and avoid unnecessary jobs, pull request checks are scoped by 
    - Builds only the services whose directories changed: `services/streaming/icecast/**`, `services/streaming/liquidsoap/**`, `infrastructure/nginx/**`, `apps/status-api/**`, `services/analytics/**`.
    - Builds all services when `docker-compose.yml` changes.
 - Pushes to `main` and release tags keep full coverage (no PR path filtering) for safety.
-
-### Codacy coverage reporting
-
-The Codacy coverage workflow lives in `.github/workflows/codacy-coverage-reporter.yml` and runs on pull requests to `main` plus pushes to `main`.
-
-To enable uploads:
-
-1. Add `CODACY_PROJECT_TOKEN` as a repository secret for this repository, or add `CODACY_API_TOKEN` as an organization secret if you manage multiple repositories from the same Codacy account.
-2. Ensure your build or test steps generate a supported coverage report before the Codacy upload step runs.
-3. Keep the coverage report inside the workspace so the workflow can discover it.
-
-The workflow currently auto-discovers these common report locations:
-
-- `coverage.xml`
-- `**/coverage.xml`
-- `cobertura.xml`
-- `**/cobertura.xml`
-- `lcov.info`
-- `**/lcov.info`
-- `coverage/lcov.info`
-- `**/coverage/lcov.info`
-- `.coverage-reports/**/*.xml`
-- `.coverage-reports/**/*.info`
-
-Usage notes:
-
-- Pull requests from forks usually do not receive repository secrets. In that case, the workflow logs a skip instead of failing.
-- Pushes to `main` fail if coverage files exist but no Codacy token is configured, so missing secret setup is visible immediately.
-- This repository's default CI currently does not generate coverage reports on its own. The Codacy workflow uploads reports that are produced by your test/build steps.
 
 ### Mirror Issue Labels — maintenance notes
 
