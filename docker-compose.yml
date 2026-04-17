@@ -61,6 +61,7 @@ services:
       - ICECAST_HOSTNAME=${ICECAST_HOSTNAME}
       - STATION_NAME=${STATION_NAME:-Radio Station}
       - STATION_ADMIN_EMAIL=${STATION_ADMIN_EMAIL:-admin@example.com}
+      - ENABLE_STATUS_PANEL=${ENABLE_STATUS_PANEL:-0}
     volumes:
       - hls-data:/hls:ro
       - ./certbot/conf:/etc/letsencrypt:ro
@@ -93,6 +94,7 @@ services:
     build: ./apps/status-api
     image: docker.io/sonicverse/audiostreaming-stack-status-api:latest
     container_name: sonicverse-status-api
+    profiles: ["status-panel"]
     depends_on:
       icecast:
         condition: service_healthy

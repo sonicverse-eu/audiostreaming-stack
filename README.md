@@ -6,7 +6,7 @@
 [![Docker Hub](https://img.shields.io/badge/Images-Docker%20Hub-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/u/sonicverse)
 [![Join Sonicverse OSS Slack](https://img.shields.io/badge/Join-Sonicverse%20OSS%20Slack-4A154B?logo=slack&logoColor=white)](https://join.slack.com/t/sonicverse-oss/shared_invite/zt-3u969i5rr-cmfgEycFAi8V7Baj0uBx0A)
 
-Self-hosted Docker Compose stack for live radio streaming. Ingest from any studio encoder, deliver via Icecast2 and HLS adaptive bitrate, with automatic fallback, silence detection, PostHog analytics, Pushover alerts, and a real-time operator dashboard.
+Self-hosted Docker Compose stack for live radio streaming. Ingest from any studio encoder, deliver via Icecast2 and HLS adaptive bitrate, with automatic fallback, silence detection, PostHog analytics, Pushover alerts, and an optional real-time operator dashboard.
 
 ## Documentation
 
@@ -52,7 +52,7 @@ Studio (BUTT/etc)
 | **Icecast2** | Stream distribution server with multiple mount points |
 | **Liquidsoap** | Stream processor — ingest, fallback chain, encoding, HLS |
 | **Nginx** | Public-facing reverse proxy + HLS segment serving |
-| **Status Panel** | Flask API backend — stream health, container status, emergency audio management |
+| **Status Panel** | Optional Flask API backend for the operator dashboard and service management |
 | **Analytics** | Polls Icecast stats and sends events to PostHog + Pushover alerts |
 | **Certbot** | Automatic Let's Encrypt certificate renewal |
 
@@ -361,10 +361,11 @@ All settings are managed via `.env` (copy from `.env.example`):
 | `PUSHOVER_APP_TOKEN` | Pushover application token |
 | `SILENCE_THRESHOLD_DB` | Silence detection threshold in dB (default: `-40`) |
 | `SILENCE_DURATION` | Seconds of silence before alerting (default: `15`) |
-| `APPWRITE_ENDPOINT` | Appwrite API endpoint |
-| `APPWRITE_PROJECT_ID` | Appwrite project ID |
-| `APPWRITE_TEAM_ID` | Appwrite team ID (required when `APPWRITE_PROJECT_ID` is set; only members get panel access) |
-| `STATUS_PANEL_CORS_ORIGIN` | Status dashboard URL(s) for CORS, comma-separated (e.g. `https://status.example.com`) |
+| `ENABLE_STATUS_PANEL` | Set to `1` to run the optional status API and expose `/api/` through nginx |
+| `APPWRITE_ENDPOINT` | Optional Appwrite API endpoint for dashboard auth |
+| `APPWRITE_PROJECT_ID` | Optional Appwrite project ID |
+| `APPWRITE_TEAM_ID` | Optional Appwrite team ID (required when `APPWRITE_PROJECT_ID` is set; only members get panel access) |
+| `STATUS_PANEL_CORS_ORIGIN` | Optional dashboard URL(s) for CORS, comma-separated |
 | `STATUS_PANEL_HOST` | Optional bind host for status API (default: `127.0.0.1`; auto-uses container IP in Docker when unset) |
 | `STATUS_PANEL_WRITE_ROLES` | Appwrite team roles allowed to manage emergency audio (default: `owner,admin`) |
 | `STATUS_PANEL_ALLOW_RISKY_COMMANDS` | Enable remote restart/SSL renewal commands (`0` by default) |
@@ -374,7 +375,13 @@ All settings are managed via `.env` (copy from `.env.example`):
 
 ## Status Panel
 
-Real-time broadcast engineer dashboard with Appwrite team-based authentication.
+Optional real-time broadcast engineer dashboard with Appwrite team-based authentication.
+
+Set `ENABLE_STATUS_PANEL=1` to include the Docker `status-api` service. If you manage the stack manually instead of using `./install.sh`, start it with:
+
+```bash
+docker compose --profile status-panel up -d
+```
 
 **Features:**
 - Live listener counts and mount point status (5s refresh)

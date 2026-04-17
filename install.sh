@@ -81,6 +81,66 @@ warn()    { echo -e "  ${YELLOW}!${NC}  $1"; }
 error()   { echo -e "  ${RED}✗${NC}  $1"; }
 step()    { echo -e "\n${BOLD}[$1/$TOTAL_STEPS] $2${NC}"; }
 
+COMPOSE_PROFILE_ARGS=()
+
+refresh_compose_profile_args() {
+    local enabled="${ENABLE_STATUS_PANEL:-}"
+
+    if [[ -z "$enabled" && -f .env ]]; then
+        enabled="$(grep '^ENABLE_STATUS_PANEL=' .env 2>/dev/null | tail -n 1 | cut -d= -f2-)"
+    fi
+
+    if [[ "$enabled" == "1" ]]; then
+        COMPOSE_PROFILE_ARGS=(--profile status-panel)
+    else
+        COMPOSE_PROFILE_ARGS=()
+    fi
+}
+
+docker_compose() {
+    refresh_compose_profile_args
+    docker compose "${COMPOSE_PROFILE_ARGS[@]}" "$@"
+}
+
+compose_up_command() {
+    refresh_compose_profile_args
+    if [[ "${#COMPOSE_PROFILE_ARGS[@]}" -gt 0 ]]; then
+        echo "docker compose --profile status-panel up -d"
+    else
+        echo "docker compose up -d"
+    fi
+}
+
+compose_down_command() {
+    refresh_compose_profile_args
+    if [[ "${#COMPOSE_PROFILE_ARGS[@]}" -gt 0 ]]; then
+        echo "docker compose --profile status-panel down"
+    else
+        echo "docker compose down"
+    fi
+}
+
+remove_conflicting_named_container() {
+    local service="$1"
+    local fixed_name="sonicverse-$service"
+    local current_id existing_id
+
+    current_id="$(docker_compose ps -q "$service" 2>/dev/null | head -n 1)"
+    existing_id="$(docker ps -aq --filter "name=^/${fixed_name}$" 2>/dev/null | head -n 1)"
+
+    if [[ -n "$existing_id" && "$existing_id" != "$current_id" ]]; then
+        warn "Removing conflicting container ${fixed_name}"
+        docker rm -f "$existing_id" >/dev/null
+    fi
+}
+
+clear_conflicting_stack_container_names() {
+    local service
+    for service in icecast liquidsoap nginx certbot status-api analytics; do
+        remove_conflicting_named_container "$service"
+    done
+}
+
 prompt() {
     local var_name="$1" prompt_text="$2" default="$3"
     if [[ -n "$default" ]]; then
@@ -171,7 +231,7 @@ fi
 # ----------------------------------------------------------
 # Detect existing installation
 # ----------------------------------------------------------
-if docker compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
+if docker_compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
     echo ""
     warn "Existing streaming stack detected!"
     echo ""
@@ -191,8 +251,8 @@ if docker compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
 
             info "Backing up currently running service images..."
             backup_count=0
-            for service in $(docker compose config --services 2>/dev/null || true); do
-                container_id="$(docker compose ps -q "$service" 2>/dev/null || true)"
+            for service in $(docker_compose config --services 2>/dev/null || true); do
+                container_id="$(docker_compose ps -q "$service" 2>/dev/null || true)"
                 if [[ -z "$container_id" ]]; then
                     continue
                 fi
@@ -215,13 +275,14 @@ if docker compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
             git pull 2>/dev/null || true
             echo ""
             info "Pulling latest images..."
-            docker compose pull || true
+            docker_compose pull || true
             echo ""
             info "Rebuilding any local images..."
-            docker compose build
+            docker_compose build
             echo ""
             info "Applying updates with zero downtime..."
-            if ! docker compose up -d --remove-orphans; then
+            clear_conflicting_stack_container_names
+            if ! docker_compose up -d --remove-orphans; then
                 error "Failed to update stack. Rolling back..."
                 if [[ -s "$backup_file" ]]; then
                     info "Restoring previously running images..."
@@ -233,19 +294,20 @@ if docker compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
                 else
                     warn "No image backups found; retrying with current images."
                 fi
-                docker compose up -d --remove-orphans || true
+                clear_conflicting_stack_container_names
+                docker_compose up -d --remove-orphans || true
                 exit 1
             fi
             echo ""
             success "Stack updated successfully!"
             echo ""
-            docker compose ps
+            docker_compose ps
             echo ""
             exit 0
             ;;
         2)
             info "Stopping and removing existing stack..."
-            docker compose down --rmi local --remove-orphans
+            docker_compose down --rmi local --remove-orphans
             docker volume rm audiostreaming-stack_hls-data audiostreaming-stack_icecast-logs 2>/dev/null || true
             success "Old stack removed"
             echo ""
@@ -260,11 +322,11 @@ if docker compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
             exit 1
             ;;
     esac
-elif docker compose ps -a --quiet 2>/dev/null | head -1 | grep -q .; then
+elif docker_compose ps -a --quiet 2>/dev/null | head -1 | grep -q .; then
     warn "Stopped containers from a previous install detected."
     read -rp "  → Remove them before continuing? (Y/n): " remove_old
     if [[ ! "$remove_old" =~ ^[Nn]$ ]]; then
-        docker compose down --rmi local --remove-orphans
+        docker_compose down --rmi local --remove-orphans
         success "Old containers removed"
     fi
 fi
@@ -387,23 +449,35 @@ if [[ "${SKIP_ENV}" != "true" ]]; then
     prompt PUSHOVER_USER_KEY  "Pushover user key (leave empty to skip alerts)" ""
     prompt PUSHOVER_APP_TOKEN "Pushover app token" ""
 
-    # Appwrite (status panel auth)
+    # Optional status dashboard
     echo ""
-    prompt APPWRITE_ENDPOINT   "Appwrite endpoint" "https://cloud.appwrite.io/v1"
-    prompt APPWRITE_PROJECT_ID "Appwrite project ID" ""
-    prompt APPWRITE_TEAM_ID    "Appwrite team ID (members get panel access)" ""
-    if [[ -n "${APPWRITE_PROJECT_ID}" && -z "${APPWRITE_TEAM_ID}" ]]; then
-        warn "APPWRITE_TEAM_ID is required when APPWRITE_PROJECT_ID is set."
-        while [[ -z "${APPWRITE_TEAM_ID}" ]]; do
-            prompt APPWRITE_TEAM_ID "Appwrite team ID (required for panel access)" ""
-            if [[ -z "${APPWRITE_TEAM_ID}" ]]; then
-                warn "Team ID cannot be empty while Appwrite panel auth is enabled."
-            fi
-        done
+    read -rp "  → Enable the optional status dashboard API now? (y/N): " configure_status_dashboard
+    if [[ "$configure_status_dashboard" =~ ^[Yy]$ ]]; then
+        ENABLE_STATUS_PANEL="1"
+        prompt APPWRITE_ENDPOINT   "Appwrite endpoint" "https://cloud.appwrite.io/v1"
+        prompt APPWRITE_PROJECT_ID "Appwrite project ID" ""
+        prompt APPWRITE_TEAM_ID    "Appwrite team ID (members get panel access)" ""
+        if [[ -n "${APPWRITE_PROJECT_ID}" && -z "${APPWRITE_TEAM_ID}" ]]; then
+            warn "APPWRITE_TEAM_ID is required when APPWRITE_PROJECT_ID is set."
+            while [[ -z "${APPWRITE_TEAM_ID}" ]]; do
+                prompt APPWRITE_TEAM_ID "Appwrite team ID (required for panel access)" ""
+                if [[ -z "${APPWRITE_TEAM_ID}" ]]; then
+                    warn "Team ID cannot be empty while Appwrite panel auth is enabled."
+                fi
+            done
+        fi
+        prompt STATUS_PANEL_CORS_ORIGIN "Status panel frontend URL(s) for CORS" ""
+        prompt STATUS_PANEL_WRITE_ROLES "Operator roles for writes (comma-separated)" "owner,admin"
+        prompt STATUS_PANEL_ALLOW_RISKY_COMMANDS "Allow destructive panel commands? (0/1)" "0"
+    else
+        ENABLE_STATUS_PANEL="0"
+        APPWRITE_ENDPOINT=""
+        APPWRITE_PROJECT_ID=""
+        APPWRITE_TEAM_ID=""
+        STATUS_PANEL_CORS_ORIGIN=""
+        STATUS_PANEL_WRITE_ROLES="owner,admin"
+        STATUS_PANEL_ALLOW_RISKY_COMMANDS="0"
     fi
-    prompt STATUS_PANEL_CORS_ORIGIN "Status panel frontend URL(s) for CORS" "https://status.example.com"
-    prompt STATUS_PANEL_WRITE_ROLES "Operator roles for writes (comma-separated)" "owner,admin"
-    prompt STATUS_PANEL_ALLOW_RISKY_COMMANDS "Allow destructive panel commands? (0/1)" "0"
 
     # PostHog
     echo ""
@@ -447,6 +521,7 @@ SILENCE_THRESHOLD_DB=-40
 SILENCE_DURATION=15
 
 # Appwrite (status panel auth)
+ENABLE_STATUS_PANEL=${ENABLE_STATUS_PANEL}
 APPWRITE_ENDPOINT=${APPWRITE_ENDPOINT}
 APPWRITE_PROJECT_ID=${APPWRITE_PROJECT_ID}
 APPWRITE_TEAM_ID=${APPWRITE_TEAM_ID}
@@ -514,13 +589,13 @@ step "$STEP_NUM" "Building containers"
 if [[ "$USE_PREBUILT" == "true" ]]; then
     info "Pulling pre-built images from Docker Hub or configured registry..."
     echo ""
-    docker compose pull || { error "Pull failed. Images may not exist yet. Run with --build-local to build locally instead."; exit 1; }
+    docker_compose pull || { error "Pull failed. Images may not exist yet. Run with --build-local to build locally instead."; exit 1; }
     echo ""
     success "All images pulled successfully"
 else
     info "Building containers locally. This may take a few minutes on first run..."
     echo ""
-    docker compose build
+    docker_compose build
     echo ""
     success "All containers built successfully"
 fi
@@ -578,11 +653,12 @@ step "$STEP_NUM" "Launch"
 echo ""
 read -rp "  → Start the streaming stack now? (Y/n): " start_now
 if [[ ! "$start_now" =~ ^[Nn]$ ]]; then
-    docker compose up -d
+    clear_conflicting_stack_container_names
+    docker_compose up -d
     echo ""
     success "Streaming stack is running!"
 else
-    info "Start later with: docker compose up -d"
+    info "Start later with: $(compose_up_command)"
 fi
 
 # ----------------------------------------------------------
@@ -611,6 +687,11 @@ echo ""
 echo -e "  ${BOLD}Useful commands:${NC}"
 echo "    docker compose logs -f          # Follow all logs"
 echo "    docker compose logs liquidsoap  # Liquidsoap logs only"
+if [[ "${ENABLE_STATUS_PANEL:-0}" == "1" ]]; then
+echo "    docker compose --profile status-panel restart  # Restart all services"
+echo "    docker compose --profile status-panel down     # Stop everything"
+else
 echo "    docker compose restart           # Restart all services"
 echo "    docker compose down              # Stop everything"
+fi
 echo ""
