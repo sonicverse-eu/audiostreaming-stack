@@ -234,6 +234,7 @@ Or for both local build and development dependencies:
    ```bash
    ./init-letsencrypt.sh
    ```
+   This script reuses the main `nginx` service when it is already running, or starts a temporary ACME-only nginx container for the HTTP challenge when the stack is not up yet. That temporary bootstrap container avoids name collisions with any existing `sonicverse-nginx` container during first-time certificate provisioning.
 
 4. **Start the stack**
    ```bash
