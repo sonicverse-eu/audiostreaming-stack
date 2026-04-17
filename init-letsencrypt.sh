@@ -13,6 +13,8 @@ set -e
 
 BOOTSTRAP_NGINX_STARTED=0
 MAIN_NGINX_WAS_RUNNING=0
+CERTBOT_SERVICE_RUNNING=0
+ENABLE_STATUS_PANEL="${ENABLE_STATUS_PANEL:-0}"
 
 cleanup_bootstrap_nginx() {
     if [[ "$BOOTSTRAP_NGINX_STARTED" == "1" ]]; then
@@ -20,7 +22,29 @@ cleanup_bootstrap_nginx() {
     fi
 }
 
+remove_conflicting_named_container() {
+    local service="$1"
+    local fixed_name="sonicverse-$service"
+    local current_id existing_id
+
+    current_id="$(docker compose ps -q "$service" 2>/dev/null | head -n 1)"
+    existing_id="$(docker ps -aq --filter "name=^/${fixed_name}$" 2>/dev/null | head -n 1)"
+
+    if [[ -n "$existing_id" && "$existing_id" != "$current_id" ]]; then
+        echo "Removing conflicting container: $fixed_name"
+        docker rm -f "$existing_id" >/dev/null
+    fi
+}
+
 trap cleanup_bootstrap_nginx EXIT INT TERM
+
+compose_up_command() {
+    if [[ "$ENABLE_STATUS_PANEL" == "1" ]]; then
+        echo "docker compose --profile status-panel up -d"
+    else
+        echo "docker compose up -d"
+    fi
+}
 
 # Load .env
 if [[ -f .env ]]; then
@@ -96,17 +120,42 @@ else
     fi
 fi
 
+if printf '%s\n' "$RUNNING_SERVICES" | grep -qx "certbot"; then
+    CERTBOT_SERVICE_RUNNING=1
+else
+    CERTBOT_CONTAINER_ID="$(docker compose ps -q certbot 2>/dev/null | head -n 1)"
+    if [[ -n "$CERTBOT_CONTAINER_ID" ]]; then
+        echo "Starting existing certbot service for certificate issuance..."
+        docker compose up -d certbot >/dev/null
+        CERTBOT_SERVICE_RUNNING=1
+    else
+        remove_conflicting_named_container "certbot"
+    fi
+fi
+
 echo "Requesting Let's Encrypt certificate..."
-# Override entrypoint since docker-compose.yml sets a renewal-loop entrypoint
-docker compose run --rm --entrypoint "" certbot \
-    certbot certonly \
-    --webroot \
-    --webroot-path=/var/www/certbot \
-    "${EMAIL_ARGS[@]}" \
-    "${STAGING_ARGS[@]}" \
-    --agree-tos \
-    --no-eff-email \
-    -d "$ICECAST_HOSTNAME"
+if [[ "$CERTBOT_SERVICE_RUNNING" == "1" ]]; then
+    docker compose exec -T certbot \
+        certbot certonly \
+        --webroot \
+        --webroot-path=/var/www/certbot \
+        "${EMAIL_ARGS[@]}" \
+        "${STAGING_ARGS[@]}" \
+        --agree-tos \
+        --no-eff-email \
+        -d "$ICECAST_HOSTNAME"
+else
+    # Override entrypoint since docker-compose.yml sets a renewal-loop entrypoint.
+    docker compose run --rm --no-deps --entrypoint "" certbot \
+        certbot certonly \
+        --webroot \
+        --webroot-path=/var/www/certbot \
+        "${EMAIL_ARGS[@]}" \
+        "${STAGING_ARGS[@]}" \
+        --agree-tos \
+        --no-eff-email \
+        -d "$ICECAST_HOSTNAME"
+fi
 
 cleanup_bootstrap_nginx
 BOOTSTRAP_NGINX_STARTED=0
@@ -121,5 +170,5 @@ echo "Done! Certificate obtained for $ICECAST_HOSTNAME"
 if [[ "$MAIN_NGINX_WAS_RUNNING" == "1" ]]; then
     echo "Nginx was restarted and is now serving the new certificate."
 else
-    echo "Start the full stack with: docker compose up -d"
+    echo "Start the full stack with: $(compose_up_command)"
 fi

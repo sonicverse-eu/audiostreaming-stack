@@ -6,7 +6,13 @@ COPY nginx.conf /etc/nginx/nginx.conf.template
 COPY index.html.template /etc/nginx/index.html.template
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 
-RUN adduser -D -u 1000 appuser && chown -R 1000:1000 /etc/nginx/nginx.conf.template /etc/nginx/index.html.template /docker-entrypoint.sh
+RUN adduser -D -u 1000 appuser \
+    && mkdir -p /usr/share/nginx/html /var/cache/nginx \
+    && chown -R 1000:1000 \
+        /etc/nginx \
+        /usr/share/nginx/html \
+        /var/cache/nginx \
+        /docker-entrypoint.sh
 USER 1000
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

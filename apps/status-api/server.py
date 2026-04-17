@@ -1,9 +1,9 @@
 """
 Sonicverse Status Panel — API backend
 
-Serves a real-time dashboard showing stream health, listener counts,
-source status, alert history, configuration, and container status.
-Protected by Appwrite authentication.
+Serves an optional real-time dashboard showing stream health, listener
+counts, source status, alert history, configuration, and container status.
+Can be protected by Appwrite authentication.
 """
 
 import functools
@@ -26,7 +26,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024 * 1024  # 1 GiB upload limit
 
-# CORS — set STATUS_PANEL_CORS_ORIGIN in your .env to your status dashboard URL(s), comma-separated.
+# CORS — set STATUS_PANEL_CORS_ORIGIN only when you expose the dashboard frontend.
 def get_cors_origins():
     raw_origins = os.getenv("STATUS_PANEL_CORS_ORIGIN", "")
     origins = {origin.strip() for origin in raw_origins.split(",") if origin.strip()}
