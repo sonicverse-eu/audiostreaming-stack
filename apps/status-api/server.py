@@ -550,7 +550,8 @@ def api_emergency_audio_delete():
     try:
         filepath = resolve_emergency_audio_file(filename)
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        app.logger.warning("Invalid emergency audio delete request: %s", e)
+        return jsonify({"error": "Invalid filename"}), 400
     except FileNotFoundError:
         return jsonify({"error": "File not found"}), 404
 
