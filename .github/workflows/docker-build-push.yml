@@ -7,6 +7,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 env:
   DOCKERHUB_NAMESPACE: sonicverse
   GHCR_IMAGE_BASE: ghcr.io/sonicverse-eu/audiostreaming-stack
