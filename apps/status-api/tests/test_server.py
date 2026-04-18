@@ -3,7 +3,7 @@ import io
 import pathlib
 import tempfile
 import unittest
-from unittest import mock
+import unittest.mock as mock
 
 import requests
 from docker.errors import DockerException
