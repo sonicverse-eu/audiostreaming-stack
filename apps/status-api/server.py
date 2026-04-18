@@ -7,7 +7,6 @@ Can be protected by Appwrite authentication.
 """
 
 import functools
-import glob as globmod
 import ipaddress
 import json
 import os
@@ -15,6 +14,7 @@ import shutil
 import socket
 import time
 from collections import deque
+from pathlib import Path
 
 import docker
 import requests
@@ -37,8 +37,8 @@ CORS(app, resources={r"/api/*": {"origins": get_cors_origins()}}, supports_crede
 
 # Configuration
 ICECAST_URL = os.getenv("ICECAST_URL", "http://icecast:8000")
-ICECAST_ADMIN_USER = os.getenv("ICECAST_ADMIN_USER", "admin")
-ICECAST_ADMIN_PASSWORD = os.getenv("ICECAST_ADMIN_PASSWORD", "changeme")
+ICECAST_ADMIN_USER = os.getenv("ICECAST_ADMIN_USER", "").strip()
+ICECAST_ADMIN_PASSWORD = os.getenv("ICECAST_ADMIN_PASSWORD", "").strip()
 STATION_NAME = os.getenv("STATION_NAME", "Radio Station")
 
 # Appwrite auth
@@ -261,13 +261,17 @@ def fetch_icecast_stats():
     try:
         resp = requests.get(
             f"{ICECAST_URL}/status-json.xsl",
-            auth=(ICECAST_ADMIN_USER, ICECAST_ADMIN_PASSWORD),
+            auth=get_icecast_auth(),
             timeout=5,
         )
         resp.raise_for_status()
         return resp.json()
+    except RuntimeError as e:
+        app.logger.warning("Icecast credentials unavailable: %s", e)
+        return {"error": "Icecast admin credentials are not configured"}
     except Exception as e:
-        return {"error": str(e)}
+        app.logger.warning("Failed to fetch Icecast status: %s", e)
+        return {"error": "Unable to fetch Icecast status"}
 
 
 def parse_stats(stats):
@@ -405,7 +409,8 @@ def api_containers():
         ]
         return jsonify(containers)
     except DockerException as e:
-        return jsonify({"error": str(e)})
+        app.logger.warning("Failed to fetch container status: %s", e)
+        return jsonify({"error": "Unable to fetch container status"}), 502
 
 
 # ============================================================
@@ -424,21 +429,62 @@ AUDIO_MAGIC = {
     ".ogg": [b"OggS"],
 }
 
+EMERGENCY_AUDIO_FILENAMES = {ext: f"fallback{ext}" for ext in ALLOWED_AUDIO_EXTENSIONS}
+
+
+def get_icecast_auth():
+    if not ICECAST_ADMIN_USER or not ICECAST_ADMIN_PASSWORD:
+        raise RuntimeError("Icecast admin credentials are not configured")
+
+    return (ICECAST_ADMIN_USER, ICECAST_ADMIN_PASSWORD)
+
+
+def get_emergency_audio_dir():
+    return Path(EMERGENCY_AUDIO_DIR).resolve()
+
+
+def get_emergency_audio_target(ext):
+    if ext not in ALLOWED_AUDIO_EXTENSIONS:
+        raise ValueError("Invalid file type")
+
+    return get_emergency_audio_dir() / EMERGENCY_AUDIO_FILENAMES[ext]
+
+
+def iter_emergency_audio_files():
+    for ext in sorted(ALLOWED_AUDIO_EXTENSIONS):
+        target = get_emergency_audio_target(ext)
+        if target.exists():
+            yield target
+
+
+def resolve_emergency_audio_file(filename):
+    if not filename or os.path.basename(filename) != filename:
+        raise ValueError("Invalid filename")
+
+    ext = Path(filename).suffix.lower()
+    if ext not in ALLOWED_AUDIO_EXTENSIONS:
+        raise ValueError("Invalid file type")
+
+    for target in iter_emergency_audio_files():
+        if target.name == filename:
+            return target
+
+    raise FileNotFoundError(filename)
+
 
 @app.route("/api/emergency-audio")
 @require_auth
 def api_emergency_audio_list():
     """List current emergency audio files."""
     files = []
-    for ext in ALLOWED_AUDIO_EXTENSIONS:
-        for f in globmod.glob(os.path.join(EMERGENCY_AUDIO_DIR, f"*{ext}")):
-            stat = os.stat(f)
-            files.append({
-                "filename": os.path.basename(f),
-                "size_bytes": stat.st_size,
-                "size_mb": round(stat.st_size / (1024 * 1024), 2),
-                "modified": int(stat.st_mtime),
-            })
+    for emergency_file in iter_emergency_audio_files():
+        stat = emergency_file.stat()
+        files.append({
+            "filename": emergency_file.name,
+            "size_bytes": stat.st_size,
+            "size_mb": round(stat.st_size / (1024 * 1024), 2),
+            "modified": int(stat.st_mtime),
+        })
     return jsonify(sorted(files, key=lambda f: f["filename"]))
 
 
@@ -474,24 +520,24 @@ def api_emergency_audio_upload():
         return jsonify({"error": "File content doesn't match audio format"}), 400
 
     # Save as fallback.<ext> (the name Liquidsoap expects)
-    target = os.path.join(EMERGENCY_AUDIO_DIR, f"fallback{ext}")
+    target = get_emergency_audio_target(ext)
 
     # Back up existing file
-    if os.path.exists(target):
-        backup = os.path.join(EMERGENCY_AUDIO_DIR, f"fallback{ext}.backup")
+    if target.exists():
+        backup = target.with_name(f"{target.name}.backup")
         shutil.copy2(target, backup)
 
-    file.save(target)
+    file.save(str(target))
 
     # Log the change
     alert = {
         "type": "emergency_audio_updated",
-        "message": f"Emergency audio updated: {file.filename} ({os.path.getsize(target) / (1024*1024):.1f} MB)",
+        "message": f"Emergency audio updated: {file.filename} ({target.stat().st_size / (1024*1024):.1f} MB)",
         "timestamp": int(time.time()),
     }
     alert_history.appendleft(alert)
 
-    return jsonify({"ok": True, "filename": f"fallback{ext}", "size_bytes": os.path.getsize(target)})
+    return jsonify({"ok": True, "filename": target.name, "size_bytes": target.stat().st_size})
 
 
 @app.route("/api/emergency-audio/delete", methods=["POST"])
@@ -501,22 +547,18 @@ def api_emergency_audio_delete():
     data = request.get_json() or {}
     filename = data.get("filename", "")
 
-    if not filename or "/" in filename or "\\" in filename or ".." in filename:
+    try:
+        filepath = resolve_emergency_audio_file(filename)
+    except ValueError as e:
+        app.logger.warning("Invalid emergency audio delete request: %s", e)
         return jsonify({"error": "Invalid filename"}), 400
-
-    ext = os.path.splitext(filename)[1].lower()
-    if ext not in ALLOWED_AUDIO_EXTENSIONS:
-        return jsonify({"error": "Invalid file type"}), 400
-
-    base_dir = os.path.realpath(EMERGENCY_AUDIO_DIR)
-    filepath = os.path.realpath(os.path.join(base_dir, filename))
-    if os.path.commonpath([base_dir, filepath]) != base_dir:
-        return jsonify({"error": "Invalid filename"}), 400
-
-    if not os.path.exists(filepath):
+    except FileNotFoundError:
         return jsonify({"error": "File not found"}), 404
 
-    os.remove(filepath)
+    try:
+        filepath.unlink()
+    except FileNotFoundError:
+        return jsonify({"error": "File not found"}), 404
     return jsonify({"ok": True})
 
 
@@ -620,7 +662,7 @@ def run_disk_usage(_):
 def run_icecast_stats(_):
     response = requests.get(
         f"{ICECAST_URL}/status-json.xsl",
-        auth=(ICECAST_ADMIN_USER, ICECAST_ADMIN_PASSWORD),
+        auth=get_icecast_auth(),
         timeout=10,
     )
     response.raise_for_status()
@@ -741,11 +783,14 @@ def api_commands_run():
     except requests.Timeout:
         return jsonify({"error": "Command timed out"}), 504
     except NotFound as e:
-        return jsonify({"error": str(e)}), 404
-    except (DockerException, requests.RequestException) as e:
-        return jsonify({"error": str(e)}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        app.logger.info("Command target not found for %s (%s): %s", command_id, service, e)
+        return jsonify({"error": "Requested resource not found"}), 404
+    except (DockerException, requests.RequestException, RuntimeError) as e:
+        app.logger.warning("Command execution failed for %s (%s): %s", command_id, service, e)
+        return jsonify({"error": "Command execution failed"}), 502
+    except Exception:
+        app.logger.exception("Unexpected command execution failure for %s (%s)", command_id, service)
+        return jsonify({"error": "Unexpected command failure"}), 500
 
 
 # ============================================================

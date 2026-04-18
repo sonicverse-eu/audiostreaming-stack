@@ -17,8 +17,8 @@ import requests
 # Configuration
 DEFAULT_ICECAST_URL = "icecast:8000"
 ICECAST_URL = os.getenv("ICECAST_URL", DEFAULT_ICECAST_URL)
-ICECAST_ADMIN_USER = os.getenv("ICECAST_ADMIN_USER", "admin")
-ICECAST_ADMIN_PASSWORD = os.getenv("ICECAST_ADMIN_PASSWORD", "changeme")
+ICECAST_ADMIN_USER = os.getenv("ICECAST_ADMIN_USER", "").strip()
+ICECAST_ADMIN_PASSWORD = os.getenv("ICECAST_ADMIN_PASSWORD", "").strip()
 POSTHOG_API_KEY = os.getenv("POSTHOG_API_KEY", "")
 POSTHOG_HOST = os.getenv("POSTHOG_HOST", "https://app.posthog.com")
 POLL_INTERVAL = int(os.getenv("POSTHOG_POLL_INTERVAL", "30"))
@@ -256,12 +256,19 @@ def get_icecast_base_url():
     return urlunsplit(("http", ICECAST_URL, "", "", "")).rstrip("/")
 
 
+def get_icecast_auth():
+    if not ICECAST_ADMIN_USER or not ICECAST_ADMIN_PASSWORD:
+        raise RuntimeError("Icecast admin credentials are not configured")
+
+    return (ICECAST_ADMIN_USER, ICECAST_ADMIN_PASSWORD)
+
+
 def fetch_icecast_stats():
     """Fetch stats from Icecast status-json.xsl endpoint."""
     try:
         resp = requests.get(
             f"{get_icecast_base_url()}/status-json.xsl",
-            auth=(ICECAST_ADMIN_USER, ICECAST_ADMIN_PASSWORD),
+            auth=get_icecast_auth(),
             timeout=10,
         )
         resp.raise_for_status()
