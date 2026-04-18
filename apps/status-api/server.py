@@ -555,7 +555,10 @@ def api_emergency_audio_delete():
     except FileNotFoundError:
         return jsonify({"error": "File not found"}), 404
 
-    filepath.unlink()
+    try:
+        filepath.unlink()
+    except FileNotFoundError:
+        return jsonify({"error": "File not found"}), 404
     return jsonify({"ok": True})
 
 

@@ -128,6 +128,24 @@ class StatusApiSecurityTests(unittest.TestCase):
         self.assertTrue((pathlib.Path(self.tempdir.name) / "fallback.mp3.backup").exists())
         self.assertFalse((pathlib.Path(self.tempdir.name) / "danger.mp3").exists())
 
+    def test_delete_returns_404_when_file_disappears_before_unlink(self):
+        target = pathlib.Path(self.tempdir.name) / "fallback.mp3"
+        target.write_bytes(b"ID3" + (b"\x00" * 2048))
+
+        with (
+            self.auth_patch(),
+            mock.patch.object(status_server, "resolve_emergency_audio_file", return_value=target),
+            mock.patch.object(pathlib.Path, "unlink", side_effect=FileNotFoundError),
+        ):
+            response = self.client.post(
+                "/api/emergency-audio/delete",
+                json={"filename": "fallback.mp3"},
+                headers=self.auth_headers,
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json, {"error": "File not found"})
+
 
 if __name__ == "__main__":
     unittest.main()
