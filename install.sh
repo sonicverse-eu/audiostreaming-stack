@@ -101,6 +101,20 @@ refresh_compose_profile_args() {
 
 docker_compose() {
     refresh_compose_profile_args
+
+    CERTBOT_LINKED=0
+    if [[ -d "$XDG_CACHE_HOME/audiostreaming-stack-installer" || -d "$HOME/.cache/audiostreaming-stack-installer" ]]; then
+        local cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/audiostreaming-stack-installer"
+        local latest_clone
+        latest_clone="$(ls -td "$cache_dir"/clone-* 2>/dev/null | head -1)"
+        if [[ -n "$latest_clone" && -d "$latest_clone/certbot" && ! -L "$(pwd)/certbot" ]]; then
+            if [[ ! -d "certbot" ]]; then
+                ln -s "$latest_clone/certbot" ./certbot
+                CERTBOT_LINKED=1
+            fi
+        fi
+    fi
+
     docker compose "${COMPOSE_PROFILE_ARGS[@]}" "$@"
 }
 
