@@ -54,7 +54,7 @@ Studio (BUTT/etc)
 | **Nginx** | Public-facing reverse proxy + HLS segment serving |
 | **Status Panel** | Optional Flask API backend for the operator dashboard and service management |
 | **Analytics** | Polls Icecast stats and sends events to PostHog + Pushover alerts |
-| **Certbot** | Automatic Let's Encrypt certificate renewal |
+| **Certbot** | Automatic Let's Encrypt certificate renewal with nginx reload signaling |
 
 ## Repository Structure
 

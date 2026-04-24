@@ -87,6 +87,8 @@ if [[ "$STAGING" == "1" ]]; then
     echo "Using Let's Encrypt staging environment (test certificates)"
 fi
 
+DEPLOY_HOOK='printf "%s\n" "$(date -u +%s)" > /etc/letsencrypt/.nginx-reload'
+
 echo "Requesting certificate for: $ICECAST_HOSTNAME"
 
 # Create required directories
@@ -139,6 +141,7 @@ if [[ "$CERTBOT_SERVICE_RUNNING" == "1" ]]; then
         certbot certonly \
         --webroot \
         --webroot-path=/var/www/certbot \
+        --deploy-hook "$DEPLOY_HOOK" \
         "${EMAIL_ARGS[@]}" \
         "${STAGING_ARGS[@]}" \
         --agree-tos \
@@ -150,6 +153,7 @@ else
         certbot certonly \
         --webroot \
         --webroot-path=/var/www/certbot \
+        --deploy-hook "$DEPLOY_HOOK" \
         "${EMAIL_ARGS[@]}" \
         "${STAGING_ARGS[@]}" \
         --agree-tos \
