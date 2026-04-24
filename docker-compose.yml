@@ -94,8 +94,8 @@ services:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
     environment:
-      - ICECAST_HOSTNAME=${ICECAST_HOSTNAME}
-      - STATION_ADMIN_EMAIL=${STATION_ADMIN_EMAIL:-admin@example.com}
+      - HOSTNAME=${ICECAST_HOSTNAME}
+      - EMAIL=${STATION_ADMIN_EMAIL:-admin@example.com}
     entrypoint:
       - /bin/sh
       - -c
