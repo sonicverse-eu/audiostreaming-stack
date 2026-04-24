@@ -32,21 +32,23 @@ else
     # Define minimal info/error for remote setup
     _info() { echo -e "  ${BLUE}ℹ${NC}  $1"; }
     _error() { echo -e "  ${RED}✗${NC}  $1"; }
-    
-    # Create a temporary directory for the clone
-    WORK_DIR="/tmp/audiostreaming-stack-$(date +%s)"
+
+    # Clone into a cache directory so the installer does not depend on the system temp area.
+    INSTALL_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/audiostreaming-stack-installer"
+    WORK_DIR="${INSTALL_CACHE_DIR}/clone-$(date +%s)-$$"
+    mkdir -p "$INSTALL_CACHE_DIR"
     mkdir -p "$WORK_DIR"
-    
+
     _info "Cloning audiostreaming-stack to $WORK_DIR"
-    
+
     # Clone the repository with shallow clone for speed
     if ! git clone --depth 1 https://github.com/sonicverse-eu/audiostreaming-stack.git "$WORK_DIR" 2>/dev/null; then
         _error "Failed to clone repository. Ensure git is installed and you have internet connectivity."
         exit 1
     fi
-    
+
     _info "Starting installer from cloned repository..."
-    
+
     # Execute the script from within the cloned directory
     cd "$WORK_DIR"
     bash ./install.sh "$@"

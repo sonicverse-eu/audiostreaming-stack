@@ -85,7 +85,15 @@ services:
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        trap exit TERM
+        while :; do
+          certbot renew --quiet --deploy-hook 'printf "%s\n" "$(date -u +%s)" > /etc/letsencrypt/.nginx-reload'
+          sleep 12h & wait $${!}
+        done
     networks:
       - streaming
     restart: unless-stopped

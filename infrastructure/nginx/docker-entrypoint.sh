@@ -3,10 +3,14 @@ set -e
 
 HOSTNAME="${ICECAST_HOSTNAME:-localhost}"
 CERT_PATH="/etc/letsencrypt/live/$HOSTNAME/fullchain.pem"
+KEY_PATH="/etc/letsencrypt/live/$HOSTNAME/privkey.pem"
 STATUS_PANEL_ENABLED="${ENABLE_STATUS_PANEL:-0}"
+RENDERED_CONFIG_PATH="/etc/nginx/rendered/nginx.conf"
+FINAL_CONFIG_PATH="/etc/nginx/nginx.conf"
+RELOAD_MARKER="/etc/letsencrypt/.nginx-reload"
 
 # Substitute only our custom variable, leave nginx variables ($host etc.) alone
-envsubst '$ICECAST_HOSTNAME' < /etc/nginx/nginx.conf.template > /tmp/nginx-substituted.conf
+envsubst '$ICECAST_HOSTNAME' < /etc/nginx/nginx.conf.template > "$RENDERED_CONFIG_PATH"
 
 # Substitute template for root index HTML with custom variables
 mkdir -p /usr/share/nginx/html
@@ -23,19 +27,45 @@ export STATION_ADMIN_EMAIL_ESC="$(escape_html "$FINAL_CONTACT_EMAIL")"
 
 envsubst '$STATION_NAME_ESC $STATION_ADMIN_EMAIL_ESC $ICECAST_HOSTNAME' < /etc/nginx/index.html.template > /usr/share/nginx/html/index.html
 
-if [ -f "$CERT_PATH" ]; then
-    echo "[nginx] SSL certificate found for $HOSTNAME — enabling HTTPS"
-    cp /tmp/nginx-substituted.conf /etc/nginx/nginx.conf
-else
-    echo "[nginx] No SSL certificate found — serving HTTP only (for ACME challenge)"
-    # Strip the HTTPS server block, keep only HTTP
-    sed '/# HTTPS_START/,/# HTTPS_END/d' /tmp/nginx-substituted.conf > /etc/nginx/nginx.conf
-fi
+write_nginx_config() {
+    if [ -f "$CERT_PATH" ] && [ -f "$KEY_PATH" ]; then
+        echo "[nginx] SSL certificate found for $HOSTNAME — enabling HTTPS"
+        cp "$RENDERED_CONFIG_PATH" "$FINAL_CONFIG_PATH"
+    else
+        echo "[nginx] No SSL certificate found — serving HTTP only (for ACME challenge)"
+        sed '/# HTTPS_START/,/# HTTPS_END/d' "$RENDERED_CONFIG_PATH" > "$FINAL_CONFIG_PATH"
+    fi
 
-if [ "$STATUS_PANEL_ENABLED" != "1" ]; then
-    echo "[nginx] Status panel API disabled — removing /api routes"
-    sed -i '/# STATUS_API_START/,/# STATUS_API_END/d' /etc/nginx/nginx.conf
-fi
+    if [ "$STATUS_PANEL_ENABLED" != "1" ]; then
+        echo "[nginx] Status panel API disabled — removing /api routes"
+        sed -i '/# STATUS_API_START/,/# STATUS_API_END/d' "$FINAL_CONFIG_PATH"
+    fi
+}
 
-rm -f /tmp/nginx-substituted.conf
+marker_value() {
+    if [ -f "$RELOAD_MARKER" ]; then
+        cat "$RELOAD_MARKER" 2>/dev/null || echo 0
+    else
+        echo 0
+    fi
+}
+
+watch_certificate_updates() {
+    last_marker="$(marker_value)"
+
+    while :; do
+        sleep 30
+        current_marker="$(marker_value)"
+
+        if [ "$current_marker" != "$last_marker" ]; then
+            last_marker="$current_marker"
+            echo "[nginx] Certificate update detected — reloading nginx"
+            write_nginx_config
+            nginx -s reload
+        fi
+    done
+}
+
+write_nginx_config
+watch_certificate_updates &
 exec nginx -g 'daemon off;'

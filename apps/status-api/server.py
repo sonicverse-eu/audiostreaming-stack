@@ -644,7 +644,14 @@ def run_restart_stack(_):
 
 
 def run_renew_ssl(_):
-    exit_code, output = get_service_container("certbot").exec_run(["certbot", "renew"])
+    exit_code, output = get_service_container("certbot").exec_run(
+        [
+            "certbot",
+            "renew",
+            "--deploy-hook",
+            'printf "%s\\n" "$(date -u +%s)" > /etc/letsencrypt/.nginx-reload',
+        ]
+    )
     return output.decode("utf-8", errors="replace").strip() or "(no output)", exit_code
 
 
