@@ -3,6 +3,8 @@ services:
     build: ./services/streaming/icecast
     image: docker.io/sonicverse/audiostreaming-stack-icecast:latest
     container_name: sonicverse-icecast
+    env_file:
+      - .env
     environment:
       - STATION_LOCATION=${STATION_LOCATION:-Netherlands}
       - STATION_ADMIN_EMAIL=${STATION_ADMIN_EMAIL:-admin@example.com}
@@ -27,6 +29,8 @@ services:
     build: ./services/streaming/liquidsoap
     image: docker.io/sonicverse/audiostreaming-stack-liquidsoap:latest
     container_name: sonicverse-liquidsoap
+    env_file:
+      - .env
     depends_on:
       icecast:
         condition: service_healthy
@@ -51,6 +55,8 @@ services:
     build: ./infrastructure/nginx
     image: docker.io/sonicverse/audiostreaming-stack-nginx:latest
     container_name: sonicverse-nginx
+    env_file:
+      - .env
     depends_on:
       - icecast
       - liquidsoap
@@ -82,6 +88,8 @@ services:
   certbot:
     image: certbot/certbot
     container_name: sonicverse-certbot
+    env_file:
+      - .env
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
@@ -93,17 +101,13 @@ services:
       - -c
       - |
         set -e
-        HOSTNAME="${ICECAST_HOSTNAME:-}"
+        HOSTNAME="${ICECAST_HOSTNAME:?ICECAST_HOSTNAME must be set}"
         EMAIL="${STATION_ADMIN_EMAIL:-admin@example.com}"
 
-        if [ -z "$HOSTNAME" ]; then
-          echo "certbot: ICECAST_HOSTNAME not set; skipping initial issuance"
-        else
-          if [ ! -d "/etc/letsencrypt/live/$HOSTNAME" ]; then
-            echo "certbot: No cert for $HOSTNAME — attempting initial issuance"
-            certbot certonly --non-interactive --agree-tos --email "$EMAIL" --webroot -w /var/www/certbot -d "$HOSTNAME" || echo "Initial issuance failed"
-            printf "%s\n" "$(date -u +%s)" > /etc/letsencrypt/.nginx-reload || true
-          fi
+        if [ ! -d "/etc/letsencrypt/live/$HOSTNAME" ]; then
+          echo "certbot: No cert for $HOSTNAME — attempting initial issuance"
+          certbot certonly --non-interactive --agree-tos --email "$EMAIL" --webroot -w /var/www/certbot -d "$HOSTNAME" || echo "Initial issuance failed"
+          printf "%s\n" "$(date -u +%s)" > /etc/letsencrypt/.nginx-reload || true
         fi
 
         trap exit TERM
@@ -122,6 +126,8 @@ services:
     image: docker.io/sonicverse/audiostreaming-stack-status-api:latest
     container_name: sonicverse-status-api
     profiles: ["status-panel"]
+    env_file:
+      - .env
     depends_on:
       icecast:
         condition: service_healthy
@@ -154,6 +160,8 @@ services:
     build: ./services/analytics
     image: docker.io/sonicverse/audiostreaming-stack-analytics:latest
     container_name: sonicverse-analytics
+    env_file:
+      - .env
     depends_on:
       icecast:
         condition: service_healthy

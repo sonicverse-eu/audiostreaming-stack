@@ -46,6 +46,30 @@ compose_up_command() {
     fi
 }
 
+setup_certbot_directory() {
+    local target_dir="$(pwd)"
+    local cache_dir=""
+
+    if [[ -d "$XDG_CACHE_HOME/audiostreaming-stack-installer" ]]; then
+        cache_dir="$XDG_CACHE_HOME/audiostreaming-stack-installer"
+    elif [[ -d "$HOME/.cache/audiostreaming-stack-installer" ]]; then
+        cache_dir="$HOME/.cache/audiostreaming-stack-installer"
+    fi
+
+    if [[ -n "$cache_dir" && -d "$cache_dir" ]]; then
+        local latest_clone
+        latest_clone="$(ls -td "$cache_dir"/clone-* 2>/dev/null | head -1)"
+        if [[ -n "$latest_clone" && -d "$latest_clone/certbot" && "$latest_clone" != "$target_dir" ]]; then
+            if [[ ! -d "$target_dir/certbot" ]]; then
+                ln -s "$latest_clone/certbot" "$target_dir/certbot"
+                echo "Linked certbot directory from $latest_clone"
+            fi
+        fi
+    fi
+}
+
+setup_certbot_directory
+
 # Load .env
 if [[ -f .env ]]; then
     export $(grep -v '^#' .env | xargs)
