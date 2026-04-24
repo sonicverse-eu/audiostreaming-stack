@@ -85,15 +85,34 @@ services:
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
+    environment:
+      - ICECAST_HOSTNAME=${ICECAST_HOSTNAME}
+      - STATION_ADMIN_EMAIL=${STATION_ADMIN_EMAIL:-admin@example.com}
     entrypoint:
       - /bin/sh
       - -c
       - |
+        set -e
+        HOSTNAME="${ICECAST_HOSTNAME:-}"
+        EMAIL="${STATION_ADMIN_EMAIL:-admin@example.com}"
+
+        if [ -z "$HOSTNAME" ]; then
+          echo "certbot: ICECAST_HOSTNAME not set; skipping initial issuance"
+        else
+          if [ ! -d "/etc/letsencrypt/live/$HOSTNAME" ]; then
+            echo "certbot: No cert for $HOSTNAME — attempting initial issuance"
+            certbot certonly --non-interactive --agree-tos --email "$EMAIL" --webroot -w /var/www/certbot -d "$HOSTNAME" || echo "Initial issuance failed"
+            printf "%s\n" "$(date -u +%s)" > /etc/letsencrypt/.nginx-reload || true
+          fi
+        fi
+
         trap exit TERM
         while :; do
           certbot renew --quiet --deploy-hook 'printf "%s\n" "$(date -u +%s)" > /etc/letsencrypt/.nginx-reload'
           sleep 12h & wait $${!}
         done
+    depends_on:
+      - nginx
     networks:
       - streaming
     restart: unless-stopped
