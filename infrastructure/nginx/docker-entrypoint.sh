@@ -61,7 +61,7 @@ watch_certificate_updates() {
             last_marker="$current_marker"
             echo "[nginx] Certificate update detected — reloading nginx"
             write_nginx_config
-            nginx -s reload
+            nginx -t && nginx -s reload
         fi
     done
 }
