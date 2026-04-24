@@ -10,6 +10,8 @@ jobs:
   changes:
     name: Detect changed components
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    permissions:
+      contents: read
     outputs:
       docs: ${{ steps.filter.outputs.docs }}
       python: ${{ steps.filter.outputs.python }}
@@ -98,6 +100,8 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: changes
     if: github.event_name == 'push' || needs.changes.outputs.python == 'true'
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
       - uses: astral-sh/ruff-action@4919ec5cf1f49eff0871dbcea0da843445b837e6  # v3
@@ -109,6 +113,8 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: changes
     if: github.event_name == 'push' || needs.changes.outputs.typescript == 'true'
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
@@ -124,6 +130,8 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: changes
     if: github.event_name == 'push' || needs.changes.outputs.dockerfiles == 'true'
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
       - uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf  # v3.1.0
@@ -136,6 +144,8 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: changes
     if: github.event_name == 'push' || needs.changes.outputs.yaml == 'true'
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - run: pip install yamllint

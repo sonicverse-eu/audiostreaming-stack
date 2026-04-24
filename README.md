@@ -351,6 +351,7 @@ All settings are managed via `.env` (copy from `.env.example`):
 | `STATION_LOCATION` | Station location (Icecast server info) |
 | `STATION_ADMIN_EMAIL` | Admin contact email |
 | `ICECAST_SOURCE_PASSWORD` | Password for Liquidsoap → Icecast connections |
+| `ICECAST_ADMIN_USER` | Icecast admin username for the status API and analytics |
 | `ICECAST_ADMIN_PASSWORD` | Icecast admin panel password |
 | `HARBOR_PASSWORD` | Password for studio → Liquidsoap connections |
 | `ICECAST_HOSTNAME` | Public hostname |
@@ -372,6 +373,9 @@ All settings are managed via `.env` (copy from `.env.example`):
 | `POSTHOG_API_KEY` | PostHog project API key |
 | `POSTHOG_HOST` | PostHog instance URL |
 | `POSTHOG_POLL_INTERVAL` | Stats polling interval in seconds (default: `30`) |
+
+The status API and analytics service now require `ICECAST_ADMIN_USER` and `ICECAST_ADMIN_PASSWORD`
+to be set explicitly in `.env`; they no longer fall back to built-in example credentials.
 
 ## Status Panel
 
