@@ -703,6 +703,7 @@ echo -e "  ${BOLD}Admin:${NC}"
 echo -e "    Icecast:   ${GREEN}https://${ICECAST_HOSTNAME:-<host>}/icecast-admin/${NC}"
 echo ""
 echo -e "  ${BOLD}Useful commands:${NC}"
+echo "    cd $(pwd)  # IMPORTANT: always run docker compose from this directory"
 echo "    docker compose logs -f          # Follow all logs"
 echo "    docker compose logs liquidsoap  # Liquidsoap logs only"
 if [[ "${ENABLE_STATUS_PANEL:-0}" == "1" ]]; then

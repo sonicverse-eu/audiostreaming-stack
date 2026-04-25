@@ -9,6 +9,9 @@ RENDERED_CONFIG_PATH="/etc/nginx/rendered/nginx.conf"
 FINAL_CONFIG_PATH="/etc/nginx/nginx.conf"
 RELOAD_MARKER="/etc/letsencrypt/.nginx-reload"
 
+# Ensure appuser can read the mounted letsencrypt directory
+chmod -R 755 /etc/letsencrypt 2>/dev/null || true
+
 # Substitute only our custom variable, leave nginx variables ($host etc.) alone
 envsubst '$ICECAST_HOSTNAME' < /etc/nginx/nginx.conf.template > "$RENDERED_CONFIG_PATH"
 
@@ -67,5 +70,6 @@ watch_certificate_updates() {
 }
 
 write_nginx_config
+
 watch_certificate_updates &
 exec nginx -g 'daemon off;'

@@ -190,7 +190,7 @@ BOOTSTRAP_NGINX_STARTED=0
 
 if [[ "$MAIN_NGINX_WAS_RUNNING" == "1" ]]; then
     echo "Restarting nginx with SSL enabled..."
-    docker compose restart nginx
+    docker compose up -d nginx
 fi
 
 echo ""
