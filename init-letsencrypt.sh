@@ -195,7 +195,8 @@ fi
 
 echo ""
 echo "Done! Certificate obtained for $ICECAST_HOSTNAME"
-chmod -R 755 certbot/conf 2>/dev/null || true
+find certbot/conf -type d -exec chmod 755 {} + 2>/dev/null || true
+find certbot/conf -type f -exec chmod 644 {} + 2>/dev/null || true
 if [[ "$MAIN_NGINX_WAS_RUNNING" == "1" ]]; then
     echo "Nginx was restarted and is now serving the new certificate."
 else
