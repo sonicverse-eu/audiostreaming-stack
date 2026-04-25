@@ -31,9 +31,6 @@ warn()    { echo -e "  ${YELLOW}!${NC}  $1"; }
 # clone the repository first and recursively call the cloned script.
 read -t 0 _ 2>/dev/null && STDIN_AVAILABLE=true || STDIN_AVAILABLE=false
 
-# Default installation directory
-INSTALL_DIR="/opt/audiostreamingstack"
-
 if [[ "$STDIN_AVAILABLE" == "true" || -f "docker-compose.yml" ]]; then
     # stdin is available (interactive) OR we're already in the repo directory
     WORK_DIR="$(pwd)"
