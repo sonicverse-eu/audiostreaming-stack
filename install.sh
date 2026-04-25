@@ -82,21 +82,44 @@ else
 
     # Check if installation directory already exists
     if [[ -d "$INSTALL_DIR" ]]; then
-        _info "Removing existing installation at $INSTALL_DIR..."
+        _info "Existing installation found at $INSTALL_DIR"
+        _info "Cloning to temporary directory to preserve existing installation..."
+
+        # Ensure parent directory exists
+        sudo mkdir -p "$(dirname "$INSTALL_DIR")"
+
+        # Create a temporary directory next to the install dir (same filesystem for atomic mv)
+        TEMP_DIR="$(sudo mktemp -d "${INSTALL_DIR}.tmp.XXXXXX")"
+        sudo chown -R "$(whoami)" "$TEMP_DIR" || true
+
+        # Clone the repository to temp directory with shallow clone for speed
+        if ! git clone --depth 1 https://github.com/sonicverse-eu/audiostreaming-stack.git "$TEMP_DIR" 2>/dev/null; then
+            _error "Failed to clone repository. Existing installation at $INSTALL_DIR remains intact."
+            _error "Ensure git is installed and you have internet connectivity."
+            sudo rm -rf "$TEMP_DIR"
+            exit 1
+        fi
+
+        # Clone succeeded, now safe to replace the existing installation
+        _info "Clone successful. Replacing existing installation..."
         sudo rm -rf "$INSTALL_DIR"
-    fi
+        sudo mv "$TEMP_DIR" "$INSTALL_DIR"
+        sudo chown -R "$(whoami)" "$INSTALL_DIR" || true
 
-    _info "Installing to $INSTALL_DIR"
+        WORK_DIR="$INSTALL_DIR"
+    else
+        _info "Installing to $INSTALL_DIR"
 
-    # Clone into the installation directory
-    WORK_DIR="$INSTALL_DIR"
-    sudo mkdir -p "$WORK_DIR"
-    sudo chown -R "$(whoami)" "$WORK_DIR" || true
+        # Clone into the installation directory
+        WORK_DIR="$INSTALL_DIR"
+        sudo mkdir -p "$WORK_DIR"
+        sudo chown -R "$(whoami)" "$WORK_DIR" || true
 
-    # Clone the repository with shallow clone for speed
-    if ! git clone --depth 1 https://github.com/sonicverse-eu/audiostreaming-stack.git "$WORK_DIR" 2>/dev/null; then
-        _error "Failed to clone repository. Ensure git is installed and you have internet connectivity."
-        exit 1
+        # Clone the repository with shallow clone for speed
+        if ! git clone --depth 1 https://github.com/sonicverse-eu/audiostreaming-stack.git "$WORK_DIR" 2>/dev/null; then
+            _error "Failed to clone repository. Ensure git is installed and you have internet connectivity."
+            exit 1
+        fi
     fi
 
     _info "Starting installer from $INSTALL_DIR..."
