@@ -67,5 +67,6 @@ watch_certificate_updates() {
 }
 
 write_nginx_config
+
 watch_certificate_updates &
 exec nginx -g 'daemon off;'

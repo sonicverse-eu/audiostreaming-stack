@@ -89,9 +89,9 @@ if [[ -f "certbot/conf/live/$ICECAST_HOSTNAME/fullchain.pem" ]]; then
         exit 0
     fi
     echo "Removing old certificate files..."
-    rm -rf "certbot/conf/live/$ICECAST_HOSTNAME"
-    rm -rf "certbot/conf/archive/$ICECAST_HOSTNAME"
-    rm -f  "certbot/conf/renewal/$ICECAST_HOSTNAME.conf"
+    sudo rm -rf "certbot/conf/live/$ICECAST_HOSTNAME"
+    sudo rm -rf "certbot/conf/archive/$ICECAST_HOSTNAME"
+    sudo rm -f  "certbot/conf/renewal/$ICECAST_HOSTNAME.conf"
     echo "Old certificate removed."
 fi
 
@@ -190,11 +190,13 @@ BOOTSTRAP_NGINX_STARTED=0
 
 if [[ "$MAIN_NGINX_WAS_RUNNING" == "1" ]]; then
     echo "Restarting nginx with SSL enabled..."
-    docker compose restart nginx
+    docker compose up -d nginx
 fi
 
 echo ""
 echo "Done! Certificate obtained for $ICECAST_HOSTNAME"
+find certbot/conf -type d -exec chmod 755 {} + 2>/dev/null || true
+find certbot/conf -type f -exec chmod 644 {} + 2>/dev/null || true
 if [[ "$MAIN_NGINX_WAS_RUNNING" == "1" ]]; then
     echo "Nginx was restarted and is now serving the new certificate."
 else
