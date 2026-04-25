@@ -89,9 +89,9 @@ if [[ -f "certbot/conf/live/$ICECAST_HOSTNAME/fullchain.pem" ]]; then
         exit 0
     fi
     echo "Removing old certificate files..."
-    rm -rf "certbot/conf/live/$ICECAST_HOSTNAME"
-    rm -rf "certbot/conf/archive/$ICECAST_HOSTNAME"
-    rm -f  "certbot/conf/renewal/$ICECAST_HOSTNAME.conf"
+    sudo rm -rf "certbot/conf/live/$ICECAST_HOSTNAME"
+    sudo rm -rf "certbot/conf/archive/$ICECAST_HOSTNAME"
+    sudo rm -f  "certbot/conf/renewal/$ICECAST_HOSTNAME.conf"
     echo "Old certificate removed."
 fi
 
@@ -195,6 +195,7 @@ fi
 
 echo ""
 echo "Done! Certificate obtained for $ICECAST_HOSTNAME"
+chmod -R 755 certbot/conf 2>/dev/null || true
 if [[ "$MAIN_NGINX_WAS_RUNNING" == "1" ]]; then
     echo "Nginx was restarted and is now serving the new certificate."
 else

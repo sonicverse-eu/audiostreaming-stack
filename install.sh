@@ -7,6 +7,9 @@
 
 set -e
 
+# Default installation directory
+INSTALL_DIR="/opt/audiostreamingstack"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -16,6 +19,11 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Output functions (defined early for use during setup)
+info()    { echo -e "  ${BLUE}ℹ${NC}  $1"; }
+success() { echo -e "  ${GREEN}✓${NC}  $1"; }
+warn()    { echo -e "  ${YELLOW}!${NC}  $1"; }
+
 # ============================================================
 # Remote Execution Detection & Setup
 # ============================================================
@@ -23,9 +31,48 @@ NC='\033[0m'
 # clone the repository first and recursively call the cloned script.
 read -t 0 _ 2>/dev/null && STDIN_AVAILABLE=true || STDIN_AVAILABLE=false
 
+# Default installation directory
+INSTALL_DIR="/opt/audiostreamingstack"
+
 if [[ "$STDIN_AVAILABLE" == "true" || -f "docker-compose.yml" ]]; then
     # stdin is available (interactive) OR we're already in the repo directory
     WORK_DIR="$(pwd)"
+
+    # Check if we should move to the default installation directory
+    if [[ "$WORK_DIR" != "$INSTALL_DIR" && -d "$INSTALL_DIR" ]]; then
+        echo ""
+        echo "An installation already exists at $INSTALL_DIR"
+        read -rp "  → Replace it? This will stop containers and remove all data. (y/N): " replace_existing
+        if [[ "$replace_existing" =~ ^[Yy]$ ]]; then
+            info "Stopping existing stack..."
+            (cd "$INSTALL_DIR" && docker compose down 2>/dev/null || true)
+            info "Removing existing installation..."
+            sudo rm -rf "$INSTALL_DIR"
+            info "Creating new installation at $INSTALL_DIR..."
+            sudo mkdir -p "$INSTALL_DIR"
+            sudo chown -R "$(whoami)" "$INSTALL_DIR" || true
+            sudo cp -r . "$INSTALL_DIR"
+            cd "$INSTALL_DIR"
+            WORK_DIR="$INSTALL_DIR"
+            echo "Installation moved to $INSTALL_DIR"
+        elif [[ "$WORK_DIR" != "$INSTALL_DIR" ]]; then
+            echo "Staying in current directory. Note: $INSTALL_DIR already exists."
+            echo "Run the installer from $INSTALL_DIR for updates."
+        fi
+    elif [[ "$WORK_DIR" != "$INSTALL_DIR" && -d "$WORK_DIR/.git" ]]; then
+        # We're in a git repo but not at INSTALL_DIR - offer to set up there
+        echo ""
+        echo "  The default install location is: $INSTALL_DIR"
+        read -rp "  → Install there now? (y/N): " install_there
+        if [[ "$install_there" =~ ^[Yy]$ ]]; then
+            sudo mkdir -p "$INSTALL_DIR"
+            sudo chown -R "$(whoami)" "$INSTALL_DIR" || true
+            sudo cp -r . "$INSTALL_DIR"
+            cd "$INSTALL_DIR"
+            WORK_DIR="$INSTALL_DIR"
+            info "Installation set up at $INSTALL_DIR"
+        fi
+    fi
 else
     # stdin is piped (from curl), and not in repo directory
 
@@ -33,13 +80,18 @@ else
     _info() { echo -e "  ${BLUE}ℹ${NC}  $1"; }
     _error() { echo -e "  ${RED}✗${NC}  $1"; }
 
-    # Clone into a cache directory so the installer does not depend on the system temp area.
-    INSTALL_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/audiostreaming-stack-installer"
-    WORK_DIR="${INSTALL_CACHE_DIR}/clone-$(date +%s)-$$"
-    mkdir -p "$INSTALL_CACHE_DIR"
-    mkdir -p "$WORK_DIR"
+    # Check if installation directory already exists
+    if [[ -d "$INSTALL_DIR" ]]; then
+        _info "Removing existing installation at $INSTALL_DIR..."
+        sudo rm -rf "$INSTALL_DIR"
+    fi
 
-    _info "Cloning audiostreaming-stack to $WORK_DIR"
+    _info "Installing to $INSTALL_DIR"
+
+    # Clone into the installation directory
+    WORK_DIR="$INSTALL_DIR"
+    sudo mkdir -p "$WORK_DIR"
+    sudo chown -R "$(whoami)" "$WORK_DIR" || true
 
     # Clone the repository with shallow clone for speed
     if ! git clone --depth 1 https://github.com/sonicverse-eu/audiostreaming-stack.git "$WORK_DIR" 2>/dev/null; then
@@ -47,7 +99,7 @@ else
         exit 1
     fi
 
-    _info "Starting installer from cloned repository..."
+    _info "Starting installer from $INSTALL_DIR..."
 
     # Execute the script from within the cloned directory
     cd "$WORK_DIR"
@@ -77,7 +129,6 @@ print_mode_info() {
     echo ""
 }
 
-info()    { echo -e "  ${BLUE}ℹ${NC}  $1"; }
 success() { echo -e "  ${GREEN}✓${NC}  $1"; }
 warn()    { echo -e "  ${YELLOW}!${NC}  $1"; }
 error()   { echo -e "  ${RED}✗${NC}  $1"; }
@@ -634,15 +685,16 @@ if [[ -f "certbot/conf/live/${ICECAST_HOSTNAME}/fullchain.pem" ]]; then
     CERT_SIZE=$(wc -c < "certbot/conf/live/${ICECAST_HOSTNAME}/fullchain.pem" 2>/dev/null || echo 0)
     if [[ "$CERT_SIZE" -lt 1500 ]]; then
         warn "Found a possibly invalid/stale certificate (${CERT_SIZE} bytes). Removing it..."
-        rm -rf "certbot/conf/live/${ICECAST_HOSTNAME}"
-        rm -rf "certbot/conf/archive/${ICECAST_HOSTNAME}"
-        rm -f  "certbot/conf/renewal/${ICECAST_HOSTNAME}.conf"
+        sudo rm -rf "certbot/conf/live/${ICECAST_HOSTNAME}"
+        sudo rm -rf "certbot/conf/archive/${ICECAST_HOSTNAME}"
+        sudo rm -f  "certbot/conf/renewal/${ICECAST_HOSTNAME}.conf"
         success "Stale certificate removed"
     fi
 fi
 
 if [[ -f "certbot/conf/live/${ICECAST_HOSTNAME}/fullchain.pem" ]]; then
     success "SSL certificate already exists for ${ICECAST_HOSTNAME}"
+    chmod -R 755 certbot/conf 2>/dev/null || true
 else
     echo ""
     read -rp "  → Obtain Let's Encrypt SSL certificate now? (Y/n): " get_cert
@@ -652,6 +704,7 @@ else
         if [[ "$dns_ready" =~ ^[Yy]$ ]]; then
             bash ./init-letsencrypt.sh
             success "SSL certificate obtained"
+            chmod -R 755 certbot/conf 2>/dev/null || true
         else
             warn "Skipped. Run ./init-letsencrypt.sh when DNS is ready."
         fi
