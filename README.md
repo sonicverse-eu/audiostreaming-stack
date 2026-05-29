@@ -482,6 +482,7 @@ Alerts have a 5-minute cooldown to prevent spam.
 | **Mirror Issue Labels to PRs** | PR opened / edited / synchronize; issue labeled / unlabeled | Copies all labels from a linked issue to its connected PRs (one-way, add-only). |
 
 The Docker Build & Push workflow verifies that GHCR and Docker Hub both expose the expected runtime platforms for each service before it compares digests.
+All repository workflows run on standard GitHub-hosted `ubuntu-24.04` runners; Docker image builds use official `docker/*` GitHub Actions.
 
 ### CI path-based triggering
 

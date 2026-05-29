@@ -19,7 +19,7 @@ concurrency:
 jobs:
   deploy-redirect:
     name: Publish to GitHub Pages
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
