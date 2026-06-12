@@ -157,17 +157,7 @@ step()    { echo -e "\n${BOLD}[$1/$TOTAL_STEPS] $2${NC}"; }
 COMPOSE_PROFILE_ARGS=()
 
 refresh_compose_profile_args() {
-    local enabled="${ENABLE_STATUS_PANEL:-}"
-
-    if [[ -z "$enabled" && -f .env ]]; then
-        enabled="$(grep '^ENABLE_STATUS_PANEL=' .env 2>/dev/null | tail -n 1 | cut -d= -f2-)"
-    fi
-
-    if [[ "$enabled" == "1" ]]; then
-        COMPOSE_PROFILE_ARGS=(--profile status-panel)
-    else
-        COMPOSE_PROFILE_ARGS=()
-    fi
+    COMPOSE_PROFILE_ARGS=()
 }
 
 docker_compose() {
@@ -190,21 +180,11 @@ docker_compose() {
 }
 
 compose_up_command() {
-    refresh_compose_profile_args
-    if [[ "${#COMPOSE_PROFILE_ARGS[@]}" -gt 0 ]]; then
-        echo "docker compose --profile status-panel up -d"
-    else
-        echo "docker compose up -d"
-    fi
+    echo "docker compose up -d"
 }
 
 compose_down_command() {
-    refresh_compose_profile_args
-    if [[ "${#COMPOSE_PROFILE_ARGS[@]}" -gt 0 ]]; then
-        echo "docker compose --profile status-panel down"
-    else
-        echo "docker compose down"
-    fi
+    echo "docker compose down"
 }
 
 remove_conflicting_named_container() {
@@ -223,7 +203,7 @@ remove_conflicting_named_container() {
 
 clear_conflicting_stack_container_names() {
     local service
-    for service in icecast liquidsoap nginx certbot status-api analytics; do
+    for service in app icecast liquidsoap nginx certbot status-api analytics; do
         remove_conflicting_named_container "$service"
     done
 }
@@ -323,7 +303,7 @@ if docker_compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
     warn "Existing streaming stack detected!"
     echo ""
     echo "  Choose an action:"
-    echo "    1) Update — rebuild and restart containers (keeps .env and data)"
+    echo "    1) Update — rebuild and restart the app (keeps .env and data)"
     echo "    2) Clean reinstall — stop, remove containers/images, reconfigure"
     echo "    3) Cancel"
     echo ""
@@ -336,7 +316,7 @@ if docker_compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
             backup_stamp="$(date +%s)"
             trap 'rm -f "$backup_file"' EXIT
 
-            info "Backing up currently running service images..."
+            info "Backing up currently running runtime images..."
             backup_count=0
             for service in $(docker_compose config --services 2>/dev/null || true); do
                 container_id="$(docker_compose ps -q "$service" 2>/dev/null || true)"
@@ -367,7 +347,7 @@ if docker_compose ps --quiet 2>/dev/null | head -1 | grep -q .; then
             info "Rebuilding any local images..."
             docker_compose build
             echo ""
-            info "Applying updates with zero downtime..."
+            info "Applying updates..."
             clear_conflicting_stack_container_names
             if ! docker_compose up -d --remove-orphans; then
                 error "Failed to update stack. Rolling back..."
@@ -778,12 +758,7 @@ echo ""
 echo -e "  ${BOLD}Useful commands:${NC}"
 echo "    cd $(pwd)  # IMPORTANT: always run docker compose from this directory"
 echo "    docker compose logs -f          # Follow all logs"
-echo "    docker compose logs liquidsoap  # Liquidsoap logs only"
-if [[ "${ENABLE_STATUS_PANEL:-0}" == "1" ]]; then
-echo "    docker compose --profile status-panel restart  # Restart all services"
-echo "    docker compose --profile status-panel down     # Stop everything"
-else
-echo "    docker compose restart           # Restart all services"
-echo "    docker compose down              # Stop everything"
-fi
+echo "    docker compose logs app        # Unified app container logs"
+echo "    docker compose restart         # Restart all services"
+echo "    docker compose down            # Stop everything"
 echo ""

@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlparse, urlunsplit
 import requests
 
 # Configuration
-DEFAULT_ICECAST_URL = "icecast:8000"
+DEFAULT_ICECAST_URL = "127.0.0.1:8000"
 ICECAST_URL = os.getenv("ICECAST_URL", DEFAULT_ICECAST_URL)
 ICECAST_ADMIN_USER = os.getenv("ICECAST_ADMIN_USER", "").strip()
 ICECAST_ADMIN_PASSWORD = os.getenv("ICECAST_ADMIN_PASSWORD", "").strip()

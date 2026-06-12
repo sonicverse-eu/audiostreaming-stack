@@ -67,6 +67,7 @@ jobs:
               - 'apps/dashboard/next.config.ts'
               - 'apps/dashboard/postcss.config.mjs'
             dockerfiles:
+              - 'Dockerfile'
               - '**/Dockerfile'
               - 'docker-compose.yml'
             yaml:

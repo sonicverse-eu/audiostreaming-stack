@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Obtain an initial Let's Encrypt certificate for the streaming stack.
-# If the main nginx service is already running, reuse it for the ACME challenge.
+# If the main app service is already running, reuse it for the ACME challenge.
 # Otherwise start a temporary ACME-only nginx container that does not depend on
-# the fixed sonicverse-nginx container name.
+# the unified runtime container.
 #
 # Usage: ./init-letsencrypt.sh
 #
@@ -12,9 +12,8 @@
 set -e
 
 BOOTSTRAP_NGINX_STARTED=0
-MAIN_NGINX_WAS_RUNNING=0
+MAIN_APP_WAS_RUNNING=0
 CERTBOT_SERVICE_RUNNING=0
-ENABLE_STATUS_PANEL="${ENABLE_STATUS_PANEL:-0}"
 
 cleanup_bootstrap_nginx() {
     if [[ "$BOOTSTRAP_NGINX_STARTED" == "1" ]]; then
@@ -39,11 +38,7 @@ remove_conflicting_named_container() {
 trap cleanup_bootstrap_nginx EXIT INT TERM
 
 compose_up_command() {
-    if [[ "$ENABLE_STATUS_PANEL" == "1" ]]; then
-        echo "docker compose --profile status-panel up -d"
-    else
-        echo "docker compose up -d"
-    fi
+    echo "docker compose up -d"
 }
 
 setup_certbot_directory() {
@@ -119,9 +114,9 @@ echo "Requesting certificate for: $ICECAST_HOSTNAME"
 mkdir -p certbot/conf certbot/www
 
 RUNNING_SERVICES="$(docker compose ps --status running --services 2>/dev/null || true)"
-if printf '%s\n' "$RUNNING_SERVICES" | grep -qx "nginx"; then
-    MAIN_NGINX_WAS_RUNNING=1
-    echo "Main nginx service is already running; reusing it for the ACME challenge."
+if printf '%s\n' "$RUNNING_SERVICES" | grep -qx "app"; then
+    MAIN_APP_WAS_RUNNING=1
+    echo "Main app service is already running; reusing it for the ACME challenge."
 else
     echo "Starting temporary ACME-only nginx service..."
     if ! docker compose --profile acme-bootstrap up -d --no-deps nginx-acme; then
@@ -188,17 +183,17 @@ fi
 cleanup_bootstrap_nginx
 BOOTSTRAP_NGINX_STARTED=0
 
-if [[ "$MAIN_NGINX_WAS_RUNNING" == "1" ]]; then
-    echo "Restarting nginx with SSL enabled..."
-    docker compose up -d nginx
+if [[ "$MAIN_APP_WAS_RUNNING" == "1" ]]; then
+    echo "Restarting app with SSL enabled..."
+    docker compose up -d app
 fi
 
 echo ""
 echo "Done! Certificate obtained for $ICECAST_HOSTNAME"
 find certbot/conf -type d -exec chmod 755 {} + 2>/dev/null || true
 find certbot/conf -type f -exec chmod 644 {} + 2>/dev/null || true
-if [[ "$MAIN_NGINX_WAS_RUNNING" == "1" ]]; then
-    echo "Nginx was restarted and is now serving the new certificate."
+if [[ "$MAIN_APP_WAS_RUNNING" == "1" ]]; then
+    echo "The app service was restarted and is now serving the new certificate."
 else
     echo "Start the full stack with: $(compose_up_command)"
 fi

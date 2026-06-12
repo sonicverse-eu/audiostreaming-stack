@@ -1,4 +1,4 @@
-name: Build & Push Docker Images
+name: Build & Push Docker Image
 
 on:
   push:
@@ -8,24 +8,18 @@ on:
     branches: [main]
 
 env:
-  DOCKERHUB_NAMESPACE: sonicverse
-  GHCR_IMAGE_BASE: ghcr.io/sonicverse-eu/audiostreaming-stack
+  DOCKERHUB_IMAGE: docker.io/sonicverse/audiostreaming-stack
+  GHCR_IMAGE: ghcr.io/sonicverse-eu/audiostreaming-stack
+  PLATFORMS: linux/amd64,linux/arm64
 
 jobs:
   changes:
-    name: Detect changed services
+    name: Detect changed runtime files
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
       docs_only: ${{ steps.docs_only.outputs.value }}
-      matrix: ${{ steps.matrix.outputs.value }}
-      affects_all: ${{ steps.filter.outputs.affects_all }}
-      icecast: ${{ steps.filter.outputs.icecast }}
-      liquidsoap: ${{ steps.filter.outputs.liquidsoap }}
-      nginx: ${{ steps.filter.outputs.nginx }}
-      status_api: ${{ steps.filter.outputs.status_api }}
-      analytics: ${{ steps.filter.outputs.analytics }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
@@ -39,117 +33,44 @@ jobs:
             docs:
               - 'docs/**'
               - '**/*.md'
-            affects_all:
+            runtime:
+              - '.dockerignore'
+              - 'Dockerfile'
               - 'docker-compose.yml'
               - '.github/workflows/docker-build-push.yml'
-            icecast:
-              - 'services/streaming/icecast/**'
-            liquidsoap:
-              - 'services/streaming/liquidsoap/**'
-            nginx:
-              - 'infrastructure/nginx/**'
-            status_api:
               - 'apps/status-api/**'
-            analytics:
               - 'services/analytics/**'
+              - 'services/streaming/**'
+              - 'infrastructure/nginx/**'
+              - 'scripts/unified-entrypoint.sh'
 
       - name: Compute docs-only change flag
         id: docs_only
         run: |
           set -euo pipefail
           docs_only=false
-          if [[ "${{ steps.filter.outputs.docs }}" == 'true' && \
-                "${{ steps.filter.outputs.affects_all }}" == 'false' && \
-                "${{ steps.filter.outputs.icecast }}" == 'false' && \
-                "${{ steps.filter.outputs.liquidsoap }}" == 'false' && \
-                "${{ steps.filter.outputs.nginx }}" == 'false' && \
-                "${{ steps.filter.outputs.status_api }}" == 'false' && \
-                "${{ steps.filter.outputs.analytics }}" == 'false' ]]; then
+          if [[ "${{ steps.filter.outputs.docs }}" == "true" && \
+                "${{ steps.filter.outputs.runtime }}" == "false" ]]; then
               docs_only=true
           fi
           echo "value=$docs_only" >> "$GITHUB_OUTPUT"
 
-      - name: Summarize detected services
+      - name: Summarize detected changes
         run: |
+          echo "docs=${{ steps.filter.outputs.docs }}"
+          echo "runtime=${{ steps.filter.outputs.runtime }}"
           echo "docs_only=${{ steps.docs_only.outputs.value }}"
-          echo "affects_all=${{ steps.filter.outputs.affects_all }}"
-          echo "icecast=${{ steps.filter.outputs.icecast }}"
-          echo "liquidsoap=${{ steps.filter.outputs.liquidsoap }}"
-          echo "nginx=${{ steps.filter.outputs.nginx }}"
-          echo "status_api=${{ steps.filter.outputs.status_api }}"
-          echo "analytics=${{ steps.filter.outputs.analytics }}"
-
-      - name: Build dynamic matrix
-        id: matrix
-        run: |
-          set -euo pipefail
-
-          matrix='{"service":['
-          sep=''
-
-          add_service() {
-              local name="$1"
-              local context="$2"
-              local platforms="$3"
-              local runner="$4"
-
-              matrix+="$sep{\"name\":\"$name\",\"context\":\"$context\""
-              if [[ -n "$platforms" ]]; then
-                  matrix+=",\"platforms\":\"$platforms\""
-              fi
-              if [[ -n "$runner" ]]; then
-                  matrix+=",\"runner\":\"$runner\""
-              fi
-              matrix+="}"
-              sep=','
-          }
-
-          if [[ "${{ github.event_name }}" != 'pull_request' || \
-                "${{ steps.filter.outputs.affects_all }}" == 'true' ]]; then
-              add_service icecast ./services/streaming/icecast \
-                  linux/amd64,linux/arm64,linux/386 \
-                  ubuntu-24.04
-              add_service liquidsoap ./services/streaming/liquidsoap linux/amd64,linux/arm64 ''
-              add_service nginx ./infrastructure/nginx \
-                  linux/amd64,linux/arm64,linux/386 \
-                  ubuntu-24.04
-              add_service status-api ./apps/status-api linux/amd64,linux/arm64 ''
-              add_service analytics ./services/analytics linux/amd64,linux/arm64 ''
-          elif [[ "${{ steps.docs_only.outputs.value }}" != 'true' ]]; then
-              [[ "${{ steps.filter.outputs.icecast }}" == 'true' ]] && \
-                  add_service icecast ./services/streaming/icecast \
-                      linux/amd64,linux/arm64,linux/386 \
-                      ubuntu-24.04
-              [[ "${{ steps.filter.outputs.liquidsoap }}" == 'true' ]] && \
-                  add_service liquidsoap ./services/streaming/liquidsoap linux/amd64,linux/arm64 ''
-              [[ "${{ steps.filter.outputs.nginx }}" == 'true' ]] && \
-                  add_service nginx ./infrastructure/nginx \
-                      linux/amd64,linux/arm64,linux/386 \
-                      ubuntu-24.04
-              [[ "${{ steps.filter.outputs.status_api }}" == 'true' ]] && \
-                  add_service status-api ./apps/status-api linux/amd64,linux/arm64 ''
-              [[ "${{ steps.filter.outputs.analytics }}" == 'true' ]] && \
-                  add_service analytics ./services/analytics linux/amd64,linux/arm64 ''
-          fi
-
-          matrix+=']}'
-          echo "value=$matrix" >> "$GITHUB_OUTPUT"
-          echo "matrix=$matrix"
 
   build:
-    name: Build ${{ matrix.service.name }}
-    runs-on: ${{ matrix.service.runner || 'ubuntu-24.04' }}
+    name: Build unified image
+    runs-on: ubuntu-24.04
     needs: changes
     if: >-
       (github.event_name == 'pull_request' && needs.changes.outputs.docs_only != 'true') ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      (github.event_name == 'push')
     permissions:
       contents: read
       packages: write
-
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
 
     steps:
       - name: Checkout
@@ -162,7 +83,7 @@ jobs:
         uses: docker/setup-buildx-action@4c0219f9b9c65bba36e54bc9a7e94f78d87ece94  # v3
 
       - name: Validate Docker Hub credentials
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push'
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -174,7 +95,7 @@ jobs:
           fi
 
       - name: Log in to GHCR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
         with:
           registry: ghcr.io
@@ -182,7 +103,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Docker Hub
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
         with:
           registry: docker.io
@@ -194,8 +115,8 @@ jobs:
         uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf  # v6
         with:
           images: |
-            ${{ env.GHCR_IMAGE_BASE }}/${{ matrix.service.name }}
-            docker.io/${{ env.DOCKERHUB_NAMESPACE }}/audiostreaming-stack-${{ matrix.service.name }}
+            ${{ env.GHCR_IMAGE }}
+            ${{ env.DOCKERHUB_IMAGE }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -206,247 +127,10 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
-        id: build_push
         uses: docker/build-push-action@5cdde42399dce8b3b3c5e4d6f6f85a928d3e4e6e  # v6
         with:
-          context: ${{ matrix.service.context }}
-          platforms: ${{ matrix.service.platforms || 'linux/amd64,linux/arm64' }}
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          context: .
+          platforms: ${{ env.PLATFORMS }}
+          push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Verify GHCR and Docker Hub digests match
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_NAMESPACE }}
-        run: |
-          set -euo pipefail
-          short_sha="${GITHUB_SHA::7}"
-          service_name="${{ matrix.service.name }}"
-          ghcr_ref="${{ env.GHCR_IMAGE_BASE }}/${{ matrix.service.name }}:sha-${short_sha}"
-          dockerhub_ref="docker.io/${DOCKERHUB_USERNAME}/audiostreaming-stack-${{ matrix.service.name }}"
-          dockerhub_ref="${dockerhub_ref}:sha-${short_sha}"
-
-          platforms="${{ matrix.service.platforms || 'linux/amd64,linux/arm64' }}"
-          initial_delay_seconds="${VERIFY_DIGEST_INITIAL_DELAY_SECONDS:-20}"
-          max_attempts="${VERIFY_DIGEST_MAX_ATTEMPTS:-4}"
-          initial_backoff_seconds="${VERIFY_DIGEST_BACKOFF_SECONDS:-10}"
-
-          echo "Verifying runtime digests for ${service_name}: ${platforms}"
-          echo "Comparing ${ghcr_ref} against ${dockerhub_ref}"
-          echo "Waiting ${initial_delay_seconds}s before inspecting manifests for registry propagation"
-          sleep "${initial_delay_seconds}"
-
-          inspect_manifest_raw() {
-              local ref="$1"
-
-              docker buildx imagetools inspect "$ref" --format '{{json .Manifest.Manifests}}' 2>&1
-          }
-
-          normalize_manifest() {
-              local ref="$1"
-
-              local raw_output=""
-
-              if raw_output="$(inspect_manifest_raw "$ref")"; then
-                  local normalized_manifest=""
-
-                  normalized_manifest="$(printf '%s\n' "$raw_output" | jq -c --arg platforms "$platforms" '
-                      def pkey($p):
-                        ($p.os + "/" + $p.architecture)
-                        + (if (($p.variant // "") != "") then "/" + $p.variant else "" end);
-                      ($platforms
-                        | split(",")
-                        | map(gsub("^ +| +$"; ""))
-                        | map(split("/"))
-                        | map({
-                            os: .[0],
-                            architecture: .[1],
-                            variant: (.[2] // "")
-                          })
-                        | INDEX(pkey(.))
-                      ) as $wanted
-                      | map(
-                          (.platform // .Platform) as $platform
-                          | select($platform != null)
-                          | select($platform.os != "unknown" and $platform.architecture != "unknown")
-                          | select($wanted[pkey($platform)] != null)
-                          | {key: pkey($platform), value: (.digest // .Digest)}
-                        )
-                      | from_entries' )"
-
-                  if [[ -z "$normalized_manifest" || "$normalized_manifest" == "null" || "$normalized_manifest" == "{}" ]]; then
-                      jq -cn --arg raw "$raw_output" '{raw: $raw, normalized: null}'
-                      return 1
-                  fi
-
-                  jq -cn --arg raw "$raw_output" --argjson normalized "$normalized_manifest" '{raw: $raw, normalized: $normalized}'
-              else
-                  jq -cn --arg raw "$raw_output" '{raw: $raw, normalized: null}'
-                  return 1
-              fi
-          }
-
-          inspect_with_retry() {
-              local ref="$1"
-              local label="$2"
-              local attempt=1
-              local backoff="${initial_backoff_seconds}"
-              local inspect_payload=""
-              local normalized_manifest=""
-              local raw_output=""
-
-              while [[ "$attempt" -le "$max_attempts" ]]; do
-                  printf '%s%s\n' \
-                      "Inspecting ${label} manifest for ${ref} " \
-                      "(attempt ${attempt}/${max_attempts})" >&2
-
-                  if inspect_payload="$(normalize_manifest "$ref")"; then
-                      raw_output="$(printf '%s\n' "$inspect_payload" | jq -r '.raw // empty')"
-                      normalized_manifest="$(printf '%s\n' "$inspect_payload" | jq -c '.normalized // empty')"
-
-                      if [[ -n "$normalized_manifest" && "$normalized_manifest" != "null" && "$normalized_manifest" != "{}" ]]; then
-                          printf '%s\n' "$inspect_payload"
-                          return 0
-                      fi
-
-                      printf '%s%s\n' \
-                          "Attempt ${attempt}/${max_attempts} for ${label} (${ref}) " \
-                          "returned an empty normalized manifest; retrying in ${backoff}s" >&2
-                  else
-                      raw_output="$(printf '%s\n' "$inspect_payload" | jq -r '.raw // empty')"
-                      printf '%s%s\n' \
-                          "Attempt ${attempt}/${max_attempts} to inspect ${label} (${ref}) " \
-                          "failed; retrying in ${backoff}s" >&2
-                  fi
-
-                  printf 'Raw inspect response for %s (%s):\n%s\n' "${label}" "${ref}" "$raw_output" >&2
-
-                  if [[ "$attempt" -lt "$max_attempts" ]]; then
-                      echo "Waiting ${backoff}s before retrying ${label} (${ref})" >&2
-                      sleep "$backoff"
-                      backoff=$((backoff * 2))
-                  fi
-
-                  attempt=$((attempt + 1))
-              done
-
-              return 1
-          }
-
-          ghcr_inspect_payload="$(inspect_with_retry "$ghcr_ref" "GHCR")" || ghcr_inspect_payload=""
-          if [[ -n "$ghcr_inspect_payload" ]]; then
-              ghcr_inspect_raw="$(printf '%s\n' "$ghcr_inspect_payload" | jq -r '.raw // empty')"
-              ghcr_manifest="$(printf '%s\n' "$ghcr_inspect_payload" | jq -c '.normalized // empty')"
-          else
-              ghcr_inspect_raw=""
-              ghcr_manifest=""
-          fi
-
-          dockerhub_inspect_payload="$(inspect_with_retry "$dockerhub_ref" "Docker Hub")" || dockerhub_inspect_payload=""
-          if [[ -n "$dockerhub_inspect_payload" ]]; then
-              dockerhub_inspect_raw="$(printf '%s\n' "$dockerhub_inspect_payload" | jq -r '.raw // empty')"
-              dockerhub_manifest="$(printf '%s\n' "$dockerhub_inspect_payload" | jq -c '.normalized // empty')"
-          else
-              dockerhub_inspect_raw=""
-              dockerhub_manifest=""
-          fi
-
-          if [[ -z "$ghcr_manifest" || -z "$dockerhub_manifest" ]]; then
-              printf '%s%s\n' \
-                "Unable to resolve runtime platform manifests for ${service_name} " \
-                "between ${ghcr_ref} and ${dockerhub_ref}" >&2
-              echo "Raw GHCR inspect response for ${ghcr_ref}:" >&2
-              printf '%s\n' "$ghcr_inspect_raw" >&2
-              echo "Raw Docker Hub inspect response for ${dockerhub_ref}:" >&2
-              printf '%s\n' "$dockerhub_inspect_raw" >&2
-              exit 1
-          fi
-
-          expected_list="$(
-              printf '%s\n' "$platforms" \
-                  | tr ',' '\n' \
-                  | sed 's/^ *//;s/ *$//' \
-                  | sort -u
-          )"
-
-          ghcr_list="$(echo "$ghcr_manifest" | jq -r 'keys[]' | sort -u)"
-          dockerhub_list="$(echo "$dockerhub_manifest" | jq -r 'keys[]' | sort -u)"
-
-          missing_ghcr="$(
-              comm -23 \
-                  <(printf '%s\n' "$expected_list") \
-                  <(printf '%s\n' "$ghcr_list")
-          )"
-
-          missing_dockerhub="$(
-              comm -23 \
-                  <(printf '%s\n' "$expected_list") \
-                  <(printf '%s\n' "$dockerhub_list")
-          )"
-
-          echo "Expected platforms: $platforms"
-          echo "GHCR platform map: $ghcr_manifest"
-          echo "Docker Hub platform map: $dockerhub_manifest"
-
-          if [[ -n "$missing_ghcr" ]]; then
-              printf '%s%s\n' \
-                "GHCR is missing expected platform(s) for ${service_name} " \
-                "between ${ghcr_ref} and ${dockerhub_ref}:" >&2
-              printf '%s\n' "$missing_ghcr" >&2
-              echo "Raw GHCR inspect response for ${ghcr_ref}:" >&2
-              printf '%s\n' "$ghcr_inspect_raw" >&2
-              echo "Raw Docker Hub inspect response for ${dockerhub_ref}:" >&2
-              printf '%s\n' "$dockerhub_inspect_raw" >&2
-              exit 1
-          fi
-
-          if [[ -n "$missing_dockerhub" ]]; then
-              printf '%s%s\n' \
-                "Docker Hub is missing expected platform(s) for ${service_name} " \
-                "between ${ghcr_ref} and ${dockerhub_ref}:" >&2
-              printf '%s\n' "$missing_dockerhub" >&2
-              echo "Raw GHCR inspect response for ${ghcr_ref}:" >&2
-              printf '%s\n' "$ghcr_inspect_raw" >&2
-              echo "Raw Docker Hub inspect response for ${dockerhub_ref}:" >&2
-              printf '%s\n' "$dockerhub_inspect_raw" >&2
-              exit 1
-          fi
-
-          digest_mismatch="$(
-              jq -n \
-                  --argjson ghcr "$ghcr_manifest" \
-                  --argjson dockerhub "$dockerhub_manifest" \
-                  --arg platforms "$platforms" '
-                    ($platforms | split(",") | map(gsub("^ +| +$"; ""))) as $expected
-                    | [
-                        $expected[]
-                        | select($ghcr[.] != $dockerhub[.])
-                        | {
-                            platform: .,
-                            ghcr: $ghcr[.],
-                            dockerhub: $dockerhub[.]
-                          }
-                      ]
-                  '
-          )"
-
-          if [[ "$(echo "$digest_mismatch" | jq 'length')" -gt 0 ]]; then
-              printf '%s%s\n' \
-                "Runtime platform digest mismatch between ${ghcr_ref} and ${dockerhub_ref} " \
-                "for ${service_name}" >&2
-              echo "$digest_mismatch" | jq -r '.[] | "Platform \(.platform): GHCR digest \(.ghcr), Docker Hub digest \(.dockerhub)"' >&2
-              echo "Raw GHCR inspect response for ${ghcr_ref}:" >&2
-              printf '%s\n' "$ghcr_inspect_raw" >&2
-              echo "Raw Docker Hub inspect response for ${dockerhub_ref}:" >&2
-              printf '%s\n' "$dockerhub_inspect_raw" >&2
-              exit 1
-          fi
-
-  docs-only:
-    name: Docs-only PR optimization
-    runs-on: ubuntu-24.04
-    needs: changes
-    if: github.event_name == 'pull_request' && needs.changes.outputs.docs_only == 'true'
-    steps:
-      - run: echo "Documentation-only PR detected. Skipping Docker build matrix."
