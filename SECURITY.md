@@ -1,12 +1,9 @@
 # Security Policy
 
+> [!WARNING]
+> **Early Development — Not Production Ready.** This project is under active development. APIs, configuration, and behaviour may change without notice. Do not use in production environments without thorough evaluation and testing.
+
 Primary project documentation is maintained at **https://docs.sonicverse.eu**. This file covers only security reporting expectations for this repository.
-
-## Supported Versions
-
-| Version | Supported |
-|---------|-----------|
-| Latest  | Yes       |
 
 ## Reporting a Vulnerability
 

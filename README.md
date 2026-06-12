@@ -6,6 +6,9 @@
 [![Docker Hub](https://img.shields.io/badge/Images-Docker%20Hub-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/u/sonicverse)
 [![Join Sonicverse OSS Slack](https://img.shields.io/badge/Join-Sonicverse%20OSS%20Slack-4A154B?logo=slack&logoColor=white)](https://join.slack.com/t/sonicverse-oss/shared_invite/zt-3u969i5rr-cmfgEycFAi8V7Baj0uBx0A)
 
+> [!WARNING]
+> **Early Development — Not Production Ready.** This project is under active development. APIs, configuration, and behaviour may change without notice. Do not use in production environments without thorough evaluation and testing.
+
 Self-hosted Docker Compose stack for live radio streaming. Ingest from any studio encoder, deliver via Icecast2 and HLS adaptive bitrate, with automatic fallback, silence detection, PostHog analytics, Pushover alerts, and an optional real-time operator dashboard.
 
 ## Documentation
