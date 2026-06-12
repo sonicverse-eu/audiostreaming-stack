@@ -354,7 +354,7 @@ All settings are managed via `.env` (copy from `.env.example`):
 | `PUSHOVER_APP_TOKEN` | Pushover application token |
 | `SILENCE_THRESHOLD_DB` | Silence detection threshold in dB (default: `-40`) |
 | `SILENCE_DURATION` | Seconds of silence before alerting (default: `15`) |
-| `ENABLE_STATUS_PANEL` | Set to `1` to start the optional status API process and expose `/api/` through nginx |
+| `ENABLE_STATUS_PANEL` | Set to `1` to expose the internal status API service through nginx |
 | `APPWRITE_ENDPOINT` | Optional Appwrite API endpoint for dashboard auth |
 | `APPWRITE_PROJECT_ID` | Optional Appwrite project ID |
 | `APPWRITE_TEAM_ID` | Optional Appwrite team ID (required when `APPWRITE_PROJECT_ID` is set; only members get panel access) |
@@ -373,10 +373,10 @@ to be set explicitly in `.env`; they no longer fall back to built-in example cre
 
 Optional real-time broadcast engineer dashboard with Appwrite team-based authentication.
 
-Set `ENABLE_STATUS_PANEL=1` to start the status API process inside the unified app container. If you manage the stack manually instead of using `./install.sh`, update `.env` and restart the app:
+Set `ENABLE_STATUS_PANEL=1` to expose the internal status API service through nginx. If you manage the stack manually instead of using `./install.sh`, update `.env` and restart the app:
 
 ```bash
-docker compose up -d --force-recreate app
+docker compose up -d --force-recreate app status-api
 ```
 
 **Features:**
@@ -397,7 +397,7 @@ npm install && npm run build
 # Deploy the out/ directory to Appwrite Sites
 ```
 
-The API backend runs inside the unified app container and is proxied through nginx at `https://<host>/api/`.
+The API backend runs as an internal-only Compose service and is proxied through nginx at `https://<host>/api/`.
 
 ## Analytics & Alerts
 

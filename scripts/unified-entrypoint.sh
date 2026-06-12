@@ -148,18 +148,11 @@ monitor_services() {
     local failed_name
 
     while :; do
+        failed_pid=""
         set +e
-        wait -n
+        wait -n -p failed_pid
         exit_code="$?"
         set -e
-
-        failed_pid=""
-        for pid in "${SERVICE_PIDS[@]}"; do
-            if ! kill -0 "$pid" 2>/dev/null; then
-                failed_pid="$pid"
-                break
-            fi
-        done
 
         failed_name="$(service_name_for_pid "$failed_pid")"
         log "$failed_name exited with status $exit_code; stopping container"
@@ -190,11 +183,6 @@ start_service icecast icecast2 -c /etc/icecast2/icecast.xml
 wait_for_url icecast "http://127.0.0.1:8000/status-json.xsl"
 
 start_service analytics python -u /opt/sonicverse/analytics/tracker.py
-
-if [[ "$STATUS_PANEL_ENABLED" == "1" ]]; then
-    start_service status-api bash -c \
-        'cd /opt/sonicverse/status-api && exec gunicorn --bind 127.0.0.1:8080 --workers 2 --timeout 30 server:app'
-fi
 
 start_service liquidsoap liquidsoap /etc/liquidsoap/radio.liq
 start_service nginx nginx -g "daemon off;"
