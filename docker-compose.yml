@@ -1,11 +1,14 @@
 services:
-  icecast:
-    build: ./services/streaming/icecast
-    image: docker.io/sonicverse/audiostreaming-stack-icecast:latest
-    container_name: sonicverse-icecast
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: docker.io/sonicverse/audiostreaming-stack:latest
+    container_name: sonicverse-app
     env_file:
       - .env
     environment:
+      - STATION_NAME=${STATION_NAME:-Radio Station}
       - STATION_LOCATION=${STATION_LOCATION:-Netherlands}
       - STATION_ADMIN_EMAIL=${STATION_ADMIN_EMAIL:-admin@example.com}
       - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD}
@@ -14,66 +17,78 @@ services:
       - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD}
       - ICECAST_HOSTNAME=${ICECAST_HOSTNAME}
       - ICECAST_MAX_LISTENERS=${ICECAST_MAX_LISTENERS}
+      - ICECAST_URL=http://127.0.0.1:8000
+      - ICECAST_INTERNAL_HOST=127.0.0.1
+      - HARBOR_PASSWORD=${HARBOR_PASSWORD}
+      - HARBOR_PRIMARY_PORT=${HARBOR_PRIMARY_PORT:-8010}
+      - HARBOR_FALLBACK_PORT=${HARBOR_FALLBACK_PORT:-8011}
+      - SILENCE_THRESHOLD_DB=${SILENCE_THRESHOLD_DB:--40}
+      - SILENCE_DURATION=${SILENCE_DURATION:-15}
+      - ANALYTICS_ALERT_URL=http://127.0.0.1:8888
+      - ENABLE_STATUS_PANEL=${ENABLE_STATUS_PANEL:-0}
+      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
+      - POSTHOG_HOST=${POSTHOG_HOST}
+      - POSTHOG_POLL_INTERVAL=${POSTHOG_POLL_INTERVAL:-30}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
+      - PUSHOVER_APP_TOKEN=${PUSHOVER_APP_TOKEN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "${HARBOR_PRIMARY_PORT:-8010}:8010"
+      - "${HARBOR_FALLBACK_PORT:-8011}:8011"
     volumes:
+      - hls-data:/hls
       - icecast-logs:/var/log/icecast2
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./emergency-audio:/emergency-audio
     networks:
       - streaming
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8000/status-json.xsl"]
+      test: ["CMD", "curl", "-sf", "http://localhost/"]
       interval: 15s
       timeout: 5s
       retries: 3
 
-  liquidsoap:
-    build: ./services/streaming/liquidsoap
-    image: docker.io/sonicverse/audiostreaming-stack-liquidsoap:latest
-    container_name: sonicverse-liquidsoap
+  status-api:
+    image: docker.io/sonicverse/audiostreaming-stack:latest
+    container_name: sonicverse-status-api
     env_file:
       - .env
-    depends_on:
-      icecast:
-        condition: service_healthy
     environment:
       - STATION_NAME=${STATION_NAME:-Radio Station}
-      - HARBOR_PASSWORD=${HARBOR_PASSWORD}
-      - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD}
+      - ICECAST_ADMIN_USER=${ICECAST_ADMIN_USER}
+      - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD}
+      - ICECAST_HOSTNAME=${ICECAST_HOSTNAME}
+      - ICECAST_MAX_LISTENERS=${ICECAST_MAX_LISTENERS}
+      - ICECAST_URL=http://app:8000
+      - HARBOR_PRIMARY_PORT=${HARBOR_PRIMARY_PORT:-8010}
+      - HARBOR_FALLBACK_PORT=${HARBOR_FALLBACK_PORT:-8011}
       - SILENCE_THRESHOLD_DB=${SILENCE_THRESHOLD_DB:--40}
       - SILENCE_DURATION=${SILENCE_DURATION:-15}
-    ports:
-      - "${HARBOR_PRIMARY_PORT:-8010}:8010"    # Studio primary (FLAC)
-      - "${HARBOR_FALLBACK_PORT:-8011}:8011"   # Studio fallback (Ogg)
+      - APPWRITE_ENDPOINT=${APPWRITE_ENDPOINT}
+      - APPWRITE_PROJECT_ID=${APPWRITE_PROJECT_ID}
+      - APPWRITE_TEAM_ID=${APPWRITE_TEAM_ID}
+      - STATUS_PANEL_CORS_ORIGIN=${STATUS_PANEL_CORS_ORIGIN}
+      - STATUS_PANEL_HOST=0.0.0.0
+      - STATUS_PANEL_WRITE_ROLES=${STATUS_PANEL_WRITE_ROLES:-owner,admin}
+      - STATUS_PANEL_ALLOW_RISKY_COMMANDS=${STATUS_PANEL_ALLOW_RISKY_COMMANDS:-0}
+      - EMERGENCY_AUDIO_DIR=/emergency-audio
+      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
     volumes:
-      - ./services/streaming/liquidsoap/radio.liq:/etc/liquidsoap/radio.liq:ro
-      - ./emergency-audio:/emergency-audio:ro
-      - hls-data:/hls
+      - ./emergency-audio:/emergency-audio
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - streaming
-    restart: unless-stopped
-
-  nginx:
-    build: ./infrastructure/nginx
-    image: docker.io/sonicverse/audiostreaming-stack-nginx:latest
-    container_name: sonicverse-nginx
-    env_file:
-      - .env
     depends_on:
-      - icecast
-      - liquidsoap
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      - ICECAST_HOSTNAME=${ICECAST_HOSTNAME}
-      - STATION_NAME=${STATION_NAME:-Radio Station}
-      - STATION_ADMIN_EMAIL=${STATION_ADMIN_EMAIL:-admin@example.com}
-      - ENABLE_STATUS_PANEL=${ENABLE_STATUS_PANEL:-0}
-    volumes:
-      - hls-data:/hls:ro
-      - ./certbot/conf:/etc/letsencrypt:ro
-      - ./certbot/www:/var/www/certbot:ro
-    networks:
-      - streaming
+      app:
+        condition: service_healthy
+    entrypoint:
+      - /bin/bash
+      - -c
+      - cd /opt/sonicverse/status-api && exec gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 30 server:app
     restart: unless-stopped
 
   nginx-acme:
@@ -101,80 +116,25 @@ services:
       - -c
       - |
         set -e
-        HOSTNAME="${ICECAST_HOSTNAME:?ICECAST_HOSTNAME must be set}"
-        EMAIL="${STATION_ADMIN_EMAIL:-admin@example.com}"
+        if [ -z "$(printenv ICECAST_HOSTNAME)" ]; then
+          echo "ICECAST_HOSTNAME must be set" >&2
+          exit 1
+        fi
 
-        if [ ! -d "/etc/letsencrypt/live/$HOSTNAME" ]; then
-          echo "certbot: No cert for $HOSTNAME — attempting initial issuance"
-          certbot certonly --non-interactive --agree-tos --email "$EMAIL" --webroot -w /var/www/certbot -d "$HOSTNAME" || echo "Initial issuance failed"
+        if [ ! -d "/etc/letsencrypt/live/$(printenv ICECAST_HOSTNAME)" ]; then
+          echo "certbot: No cert for $(printenv ICECAST_HOSTNAME) - attempting initial issuance"
+          certbot certonly --non-interactive --agree-tos --email "$(printenv STATION_ADMIN_EMAIL)" --webroot -w /var/www/certbot -d "$(printenv ICECAST_HOSTNAME)" || echo "Initial issuance failed"
           printf "%s\n" "$(date -u +%s)" > /etc/letsencrypt/.nginx-reload || true
         fi
 
         trap exit TERM
         while :; do
           certbot renew --quiet --deploy-hook 'printf "%s\n" "$(date -u +%s)" > /etc/letsencrypt/.nginx-reload'
-          sleep 12h & wait $${!}
+          sleep 12h & wait
         done
     depends_on:
-      - nginx
-    networks:
-      - streaming
-    restart: unless-stopped
-
-  status-api:
-    build: ./apps/status-api
-    image: docker.io/sonicverse/audiostreaming-stack-status-api:latest
-    container_name: sonicverse-status-api
-    profiles: ["status-panel"]
-    env_file:
-      - .env
-    depends_on:
-      icecast:
+      app:
         condition: service_healthy
-    environment:
-      - STATION_NAME=${STATION_NAME:-Radio Station}
-      - ICECAST_URL=http://icecast:8000
-      - ICECAST_ADMIN_USER=${ICECAST_ADMIN_USER}
-      - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD}
-      - ICECAST_HOSTNAME=${ICECAST_HOSTNAME}
-      - ICECAST_MAX_LISTENERS=${ICECAST_MAX_LISTENERS}
-      - HARBOR_PRIMARY_PORT=${HARBOR_PRIMARY_PORT:-8010}
-      - HARBOR_FALLBACK_PORT=${HARBOR_FALLBACK_PORT:-8011}
-      - SILENCE_THRESHOLD_DB=${SILENCE_THRESHOLD_DB:--40}
-      - SILENCE_DURATION=${SILENCE_DURATION:-15}
-      - APPWRITE_ENDPOINT=${APPWRITE_ENDPOINT}
-      - APPWRITE_PROJECT_ID=${APPWRITE_PROJECT_ID}
-      - APPWRITE_TEAM_ID=${APPWRITE_TEAM_ID}
-      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
-      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
-      - STATUS_PANEL_CORS_ORIGIN=${STATUS_PANEL_CORS_ORIGIN}
-      - EMERGENCY_AUDIO_DIR=/emergency-audio
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./emergency-audio:/emergency-audio
-    networks:
-      - streaming
-    restart: unless-stopped
-
-  analytics:
-    build: ./services/analytics
-    image: docker.io/sonicverse/audiostreaming-stack-analytics:latest
-    container_name: sonicverse-analytics
-    env_file:
-      - .env
-    depends_on:
-      icecast:
-        condition: service_healthy
-    environment:
-      - STATION_NAME=${STATION_NAME:-Radio Station}
-      - ICECAST_URL=http://icecast:8000
-      - ICECAST_ADMIN_USER=${ICECAST_ADMIN_USER}
-      - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD}
-      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
-      - POSTHOG_HOST=${POSTHOG_HOST}
-      - POSTHOG_POLL_INTERVAL=${POSTHOG_POLL_INTERVAL:-30}
-      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
-      - PUSHOVER_APP_TOKEN=${PUSHOVER_APP_TOKEN}
     networks:
       - streaming
     restart: unless-stopped

@@ -2,14 +2,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/sonicverse-eu/audiostreaming-stack/actions/workflows/lint.yml/badge.svg)](https://github.com/sonicverse-eu/audiostreaming-stack/actions/workflows/lint.yml)
-[![GHCR](https://img.shields.io/badge/Images-GHCR-blue?logo=github)](https://github.com/sonicverse-eu/audiostreaming-stack/pkgs/container/audiostreaming-stack%2Ficecast)
+[![GHCR](https://img.shields.io/badge/Image-GHCR-blue?logo=github)](https://github.com/sonicverse-eu/audiostreaming-stack/pkgs/container/audiostreaming-stack)
 [![Docker Hub](https://img.shields.io/badge/Images-Docker%20Hub-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/u/sonicverse)
 [![Join Sonicverse OSS Slack](https://img.shields.io/badge/Join-Sonicverse%20OSS%20Slack-4A154B?logo=slack&logoColor=white)](https://join.slack.com/t/sonicverse-oss/shared_invite/zt-3u969i5rr-cmfgEycFAi8V7Baj0uBx0A)
 
 > [!WARNING]
 > **Early Development — Not Production Ready.** This project is under active development. APIs, configuration, and behaviour may change without notice. Do not use in production environments without thorough evaluation and testing.
 
-Self-hosted Docker Compose stack for live radio streaming. Ingest from any studio encoder, deliver via Icecast2 and HLS adaptive bitrate, with automatic fallback, silence detection, PostHog analytics, Pushover alerts, and an optional real-time operator dashboard.
+Self-hosted Docker Compose stack for live radio streaming. Ingest from any studio encoder, deliver via Icecast2 and HLS adaptive bitrate, with automatic fallback, silence detection, PostHog analytics, Pushover alerts, and an optional real-time operator dashboard. The runtime services ship in one consolidated Docker image managed by a single container entrypoint.
 
 ## Documentation
 
@@ -32,20 +32,17 @@ Studio (BUTT/etc)
    ├── MP3 320k stream ──► :8010 ─┐
    └── MP3 192k stream ──► :8011 ─┤
                               ▼
-                      ┌─────────────┐
-                      │  Liquidsoap  │──► HLS segments
-                      │  (encoding + │
-                      │   fallback)  │
-                      └──────┬───────┘
-                             │
-                      ┌──────▼───────┐
-                      │   Icecast2   │  6 mount points
-                      └──────┬───────┘
-                             │
-                      ┌──────▼───────┐
-                      │    Nginx     │  :80 / :443
-                      │  HLS + proxy │
-                      └──────────────┘
+                   ┌───────────────────────┐
+                   │ sonicverse app image  │
+                   │                       │
+                   │ Liquidsoap ─► HLS     │
+                   │     │                 │
+                   │     ▼                 │
+                   │ Icecast2 ─► Nginx     │
+                   │ Analytics + API       │
+                   └──────────┬────────────┘
+                              │
+                         :80 / :443
 ```
 
 ## Services
@@ -57,15 +54,16 @@ Studio (BUTT/etc)
 | **Nginx** | Public-facing reverse proxy + HLS segment serving |
 | **Status Panel** | Optional Flask API backend for the operator dashboard and service management |
 | **Analytics** | Polls Icecast stats and sends events to PostHog + Pushover alerts |
-| **Certbot** | Automatic Let's Encrypt certificate renewal with nginx reload signaling |
+| **Certbot** | Automatic Let's Encrypt certificate renewal with app reload signaling |
 
 ## Repository Structure
 
 - `.github/` contains repository automation and project metadata, including issue templates and GitHub Actions workflows.
 - `.vscode/` contains editor settings and recommended workspace configuration for contributors using VS Code.
 - `apps/` contains operator-facing applications: the Next.js dashboard in `apps/dashboard/` and the Flask status API in `apps/status-api/`.
-- `services/` contains deployable runtime services, grouped by domain: streaming services in `services/streaming/` and telemetry in `services/analytics/`.
+- `services/` contains runtime service code grouped by domain: streaming services in `services/streaming/` and telemetry in `services/analytics/`.
 - `infrastructure/` contains edge and routing infrastructure definitions, currently the Nginx reverse proxy in `infrastructure/nginx/`.
+- `Dockerfile` builds the unified runtime image and `scripts/unified-entrypoint.sh` supervises the processes inside the container.
 - `emergency-audio/` stores local fallback media used when both studio streams are unavailable (operator-created during setup).
 
 ## Stream Inputs (Studio → Liquidsoap)
@@ -138,34 +136,25 @@ This installs **only what's needed to run**:
 - Node.js / npm (dashboard already built into image)
 - Python / pip (analytics & API already built into image)
 
-**Time:** ~2–5 minutes (mostly downloading ~500MB of container images)
+**Time:** ~2–5 minutes (mostly downloading the unified runtime image)
 
 ### Container registries
 
-Pre-built service images are published to both registries:
+The pre-built runtime image is published to both registries:
 
 - **Primary (default): Docker Hub** under `sonicverse`.
 - **Mirror:** GHCR under `ghcr.io/sonicverse-eu/audiostreaming-stack`.
 
-The Build & Push Docker Images workflow verifies cross-registry parity per expected runtime platform
-for `linux/amd64`, `linux/arm64`, and configured `linux/386` targets.
-The check fails when a required platform is missing in either registry or when per-platform digests differ.
+The Build & Push Docker Image workflow builds the same multi-process runtime image for
+`linux/amd64` and `linux/arm64`.
 
-Docker Hub image names:
+Docker Hub image name:
 
-- `docker.io/sonicverse/audiostreaming-stack-icecast:latest`
-- `docker.io/sonicverse/audiostreaming-stack-liquidsoap:latest`
-- `docker.io/sonicverse/audiostreaming-stack-nginx:latest`
-- `docker.io/sonicverse/audiostreaming-stack-status-api:latest`
-- `docker.io/sonicverse/audiostreaming-stack-analytics:latest`
+- `docker.io/sonicverse/audiostreaming-stack:latest`
 
-GHCR mirror names:
+GHCR mirror name:
 
-- `ghcr.io/sonicverse-eu/audiostreaming-stack/icecast:latest`
-- `ghcr.io/sonicverse-eu/audiostreaming-stack/liquidsoap:latest`
-- `ghcr.io/sonicverse-eu/audiostreaming-stack/nginx:latest`
-- `ghcr.io/sonicverse-eu/audiostreaming-stack/status-api:latest`
-- `ghcr.io/sonicverse-eu/audiostreaming-stack/analytics:latest`
+- `ghcr.io/sonicverse-eu/audiostreaming-stack:latest`
 
 ### 📦 Full development environment
 
@@ -191,7 +180,7 @@ This includes everything above **plus**:
 
 ### 🔨 Build containers locally (advanced)
 
-Build container images locally instead of pulling pre-built images — use this if you need to modify Dockerfile or container code:
+Build the runtime image locally instead of pulling a pre-built image - use this if you need to modify Dockerfile or container code:
 
 **Via short link:**
 ```bash
@@ -216,7 +205,7 @@ Or for both local build and development dependencies:
 ./install.sh --build-local --dev
 ```
 
-**Time:** ~15–30 minutes (building ~3 container images locally)
+**Time:** ~15–30 minutes (building the unified runtime image locally)
 
 ### Manual setup
 
@@ -237,7 +226,7 @@ Or for both local build and development dependencies:
    ```bash
    ./init-letsencrypt.sh
    ```
-   This script reuses the main `nginx` service when it is already running, or starts a temporary ACME-only nginx container for the HTTP challenge when the stack is not up yet. That temporary bootstrap container avoids name collisions with any existing `sonicverse-nginx` container during first-time certificate provisioning.
+   This script reuses the main `app` service when it is already running, or starts a temporary ACME-only nginx container for the HTTP challenge when the stack is not up yet. That temporary bootstrap container avoids port conflicts during first-time certificate provisioning.
 
 4. **Start the stack**
    ```bash
@@ -365,7 +354,7 @@ All settings are managed via `.env` (copy from `.env.example`):
 | `PUSHOVER_APP_TOKEN` | Pushover application token |
 | `SILENCE_THRESHOLD_DB` | Silence detection threshold in dB (default: `-40`) |
 | `SILENCE_DURATION` | Seconds of silence before alerting (default: `15`) |
-| `ENABLE_STATUS_PANEL` | Set to `1` to run the optional status API and expose `/api/` through nginx |
+| `ENABLE_STATUS_PANEL` | Set to `1` to expose the internal status API service through nginx |
 | `APPWRITE_ENDPOINT` | Optional Appwrite API endpoint for dashboard auth |
 | `APPWRITE_PROJECT_ID` | Optional Appwrite project ID |
 | `APPWRITE_TEAM_ID` | Optional Appwrite team ID (required when `APPWRITE_PROJECT_ID` is set; only members get panel access) |
@@ -384,10 +373,10 @@ to be set explicitly in `.env`; they no longer fall back to built-in example cre
 
 Optional real-time broadcast engineer dashboard with Appwrite team-based authentication.
 
-Set `ENABLE_STATUS_PANEL=1` to include the Docker `status-api` service. If you manage the stack manually instead of using `./install.sh`, start it with:
+Set `ENABLE_STATUS_PANEL=1` to expose the internal status API service through nginx. If you manage the stack manually instead of using `./install.sh`, update `.env` and restart the app:
 
 ```bash
-docker compose --profile status-panel up -d
+docker compose up -d --force-recreate app status-api
 ```
 
 **Features:**
@@ -408,7 +397,7 @@ npm install && npm run build
 # Deploy the out/ directory to Appwrite Sites
 ```
 
-The API backend runs in the Docker stack and is proxied through nginx at `https://<host>/api/`.
+The API backend runs as an internal-only Compose service and is proxied through nginx at `https://<host>/api/`.
 
 ## Analytics & Alerts
 
@@ -435,6 +424,7 @@ Alerts have a 5-minute cooldown to prevent spam.
 
 ```
 ├── docker-compose.yml
+├── Dockerfile
 ├── .env.example
 ├── install-dev-deps.sh
 ├── install-dev-deps.ps1
@@ -443,9 +433,10 @@ Alerts have a 5-minute cooldown to prevent spam.
 ├── install.sh
 ├── init-letsencrypt.sh
 ├── setup-firewall.sh
+├── scripts/
+│   └── unified-entrypoint.sh
 ├── apps/
-│   ├── status-api/            ← API backend (Docker)
-│   │   ├── Dockerfile
+│   ├── status-api/            ← API backend process
 │   │   ├── requirements.txt
 │   │   └── server.py
 │   └── dashboard/             ← Next.js frontend (Appwrite Sites)
@@ -455,19 +446,15 @@ Alerts have a 5-minute cooldown to prevent spam.
 │       └── package.json
 ├── services/
 │   ├── analytics/
-│   │   ├── Dockerfile
 │   │   ├── requirements.txt
 │   │   └── tracker.py
 │   └── streaming/
 │       ├── icecast/
-│       │   ├── Dockerfile
 │       │   └── icecast.xml
 │       └── liquidsoap/
-│           ├── Dockerfile
 │           └── radio.liq
 ├── infrastructure/
 │   └── nginx/
-│       ├── Dockerfile
 │       └── nginx.conf
 └── emergency-audio/
     └── fallback.mp3
@@ -479,12 +466,11 @@ Alerts have a 5-minute cooldown to prevent spam.
 |---|---|---|
 | **Lint** | Push / PR to `main` | Runs component-aware checks: Ruff (Python), ESLint (TypeScript), hadolint (Dockerfiles), yamllint (YAML) |
 | **TruffleHog Secret Scan** | Push / PR to `main` | Scans commit history for verified leaked secrets using TruffleHog's CLI flags |
-| **Docker Build & Push** | Push / PR to `main`, tags `v*.*.*` | Builds service images and publishes to GHCR + Docker Hub; on PRs, only changed services are built |
+| **Docker Build & Push** | Push / PR to `main`, tags `v*.*.*` | Builds the unified runtime image and publishes it to GHCR + Docker Hub |
 | **AI Autolabel Issues** | Issue opened / edited / reopened | Applies `Type:`, `Scope:`, and `Priority:` labels via GitHub Models (GPT-4o-mini) |
 | **Sync Status Labels** | Issue / PR labeled or unlabeled | Keeps `Status:` labels in sync between an issue and its connected PRs (issue → PR, one-way) |
 | **Mirror Issue Labels to PRs** | PR opened / edited / synchronize; issue labeled / unlabeled | Copies all labels from a linked issue to its connected PRs (one-way, add-only). |
 
-The Docker Build & Push workflow verifies that GHCR and Docker Hub both expose the expected runtime platforms for each service before it compares digests.
 All repository workflows run on standard GitHub-hosted `ubuntu-24.04` runners; Docker image builds use official `docker/*` GitHub Actions.
 
 ### CI path-based triggering
@@ -498,8 +484,7 @@ To reduce CI time and avoid unnecessary jobs, pull request checks are scoped by 
    - Dockerfile lint runs when any `Dockerfile` or `docker-compose.yml` changes.
    - YAML lint runs when any `*.yml` or `*.yaml` changes, and validates all tracked YAML files in the repository.
 - Docker Build & Push workflow mapping (PRs):
-   - Builds only the services whose directories changed: `services/streaming/icecast/**`, `services/streaming/liquidsoap/**`, `infrastructure/nginx/**`, `apps/status-api/**`, `services/analytics/**`.
-   - Builds all services when `docker-compose.yml` changes.
+   - Builds the unified image when runtime paths change: `Dockerfile`, `docker-compose.yml`, `scripts/unified-entrypoint.sh`, `services/**`, `apps/status-api/**`, `infrastructure/nginx/**`, or the workflow itself.
 - Pushes to `main` and release tags keep full coverage (no PR path filtering) for safety.
 
 ### SonarQube Cloud automatic analysis

@@ -36,7 +36,7 @@ def get_cors_origins():
 CORS(app, resources={r"/api/*": {"origins": get_cors_origins()}}, supports_credentials=False)
 
 # Configuration
-ICECAST_URL = os.getenv("ICECAST_URL", "http://icecast:8000")
+ICECAST_URL = os.getenv("ICECAST_URL", "http://127.0.0.1:8000")
 ICECAST_ADMIN_USER = os.getenv("ICECAST_ADMIN_USER", "").strip()
 ICECAST_ADMIN_PASSWORD = os.getenv("ICECAST_ADMIN_PASSWORD", "").strip()
 STATION_NAME = os.getenv("STATION_NAME", "Radio Station")
@@ -566,7 +566,7 @@ def api_emergency_audio_delete():
 # Safe remote commands (whitelisted only)
 # ============================================================
 
-ALLOWED_SERVICES = {"icecast", "liquidsoap", "nginx", "analytics", "status-api", "certbot"}
+ALLOWED_SERVICES = {"app", "certbot"}
 
 @functools.lru_cache(maxsize=1)
 def get_docker_client():
@@ -677,7 +677,7 @@ def run_restart_service(service):
 
 def run_restart_stack(_):
     containers = [container for container in get_stack_containers() if container.status == "running"]
-    containers.sort(key=lambda container: container.name == "sonicverse-status-api")
+    containers.sort(key=lambda container: container.name == "sonicverse-app")
     restarted = []
     for container in containers:
         container.restart(timeout=10)

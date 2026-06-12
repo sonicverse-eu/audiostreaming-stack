@@ -109,6 +109,13 @@ class StatusApiSecurityTests(unittest.TestCase):
         self.assertEqual(response.json["error"], "Command execution failed")
         self.assertNotIn("docker.sock", response.get_data(as_text=True))
 
+    def test_commands_list_exposes_unified_runtime_services(self):
+        with self.auth_patch():
+            response = self.client.get("/api/commands", headers=self.auth_headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["services"], ["app", "certbot"])
+
     def test_upload_uses_canonical_storage_for_operator(self):
         existing_target = pathlib.Path(self.tempdir.name) / "fallback.mp3"
         existing_target.write_bytes(b"ID3" + (b"\x00" * 2048))
