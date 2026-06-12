@@ -132,7 +132,7 @@ print_banner() {
     echo -e "${CYAN}${BOLD}"
     echo "  ╔════════════════════════════════════════════════╗"
     echo "  ║   Sonicverse — Radio Audio Streaming Stack     ║"
-    echo "  ║   Liquidsoap + Icecast2 + HLS + PostHog        ║"
+    echo "  ║   Liquidsoap + Icecast2 + HLS                  ║"
     echo "  ╚════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
@@ -203,7 +203,7 @@ remove_conflicting_named_container() {
 
 clear_conflicting_stack_container_names() {
     local service
-    for service in app icecast liquidsoap nginx certbot status-api analytics; do
+    for service in app icecast liquidsoap nginx certbot status-api; do
         remove_conflicting_named_container "$service"
     done
 }
@@ -240,7 +240,7 @@ Usage:
 
 Options:
   --dev              Install Node/Python dependencies for local development.
-                     Required for: building dashboard, running analytics/API locally.
+                     Required for: building dashboard and running the API locally.
                                          Skip this if using Docker Hub pre-built images (recommended for deployment).
     --build-local      Build container images locally instead of pulling from Docker Hub.
                      Use this if you need to modify Dockerfile or container code.
@@ -511,11 +511,6 @@ if [[ "${SKIP_ENV}" != "true" ]]; then
         LETSENCRYPT_STAGING=1
     fi
 
-    # Pushover alerts
-    echo ""
-    prompt PUSHOVER_USER_KEY  "Pushover user key (leave empty to skip alerts)" ""
-    prompt PUSHOVER_APP_TOKEN "Pushover app token" ""
-
     # Optional status dashboard
     echo ""
     read -rp "  → Enable the optional status dashboard API now? (y/N): " configure_status_dashboard
@@ -545,12 +540,6 @@ if [[ "${SKIP_ENV}" != "true" ]]; then
         STATUS_PANEL_WRITE_ROLES="owner,admin"
         STATUS_PANEL_ALLOW_RISKY_COMMANDS="0"
     fi
-
-    # PostHog
-    echo ""
-    prompt POSTHOG_API_KEY  "PostHog API key (leave empty to skip analytics)" ""
-    prompt POSTHOG_HOST     "PostHog host" "https://posthog.sonicverse.tech"
-    prompt POSTHOG_POLL_INTERVAL "Analytics poll interval (seconds)" "30"
 
     # Ports
     echo ""
@@ -583,9 +572,6 @@ LETSENCRYPT_STAGING=${LETSENCRYPT_STAGING}
 HOSTNAME=${ICECAST_HOSTNAME}
 EMAIL=${LETSENCRYPT_EMAIL}
 
-# Pushover alerts
-PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
-PUSHOVER_APP_TOKEN=${PUSHOVER_APP_TOKEN}
 SILENCE_THRESHOLD_DB=-40
 SILENCE_DURATION=15
 
@@ -598,10 +584,6 @@ STATUS_PANEL_CORS_ORIGIN=${STATUS_PANEL_CORS_ORIGIN}
 STATUS_PANEL_WRITE_ROLES=${STATUS_PANEL_WRITE_ROLES}
 STATUS_PANEL_ALLOW_RISKY_COMMANDS=${STATUS_PANEL_ALLOW_RISKY_COMMANDS}
 
-# PostHog
-POSTHOG_API_KEY=${POSTHOG_API_KEY}
-POSTHOG_HOST=${POSTHOG_HOST}
-POSTHOG_POLL_INTERVAL=${POSTHOG_POLL_INTERVAL}
 ENVFILE
 
     success ".env file created"

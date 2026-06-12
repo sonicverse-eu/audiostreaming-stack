@@ -39,7 +39,6 @@ jobs:
               - 'docker-compose.yml'
               - '.github/workflows/docker-build-push.yml'
               - 'apps/status-api/**'
-              - 'services/analytics/**'
               - 'services/streaming/**'
               - 'infrastructure/nginx/**'
               - 'scripts/unified-entrypoint.sh'

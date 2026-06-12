@@ -24,13 +24,7 @@ services:
       - HARBOR_FALLBACK_PORT=${HARBOR_FALLBACK_PORT:-8011}
       - SILENCE_THRESHOLD_DB=${SILENCE_THRESHOLD_DB:--40}
       - SILENCE_DURATION=${SILENCE_DURATION:-15}
-      - ANALYTICS_ALERT_URL=http://127.0.0.1:8888
       - ENABLE_STATUS_PANEL=${ENABLE_STATUS_PANEL:-0}
-      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
-      - POSTHOG_HOST=${POSTHOG_HOST}
-      - POSTHOG_POLL_INTERVAL=${POSTHOG_POLL_INTERVAL:-30}
-      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
-      - PUSHOVER_APP_TOKEN=${PUSHOVER_APP_TOKEN}
     ports:
       - "80:80"
       - "443:443"
@@ -75,8 +69,6 @@ services:
       - STATUS_PANEL_WRITE_ROLES=${STATUS_PANEL_WRITE_ROLES:-owner,admin}
       - STATUS_PANEL_ALLOW_RISKY_COMMANDS=${STATUS_PANEL_ALLOW_RISKY_COMMANDS:-0}
       - EMERGENCY_AUDIO_DIR=/emergency-audio
-      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
-      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
     volumes:
       - ./emergency-audio:/emergency-audio
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -123,7 +115,14 @@ services:
 
         if [ ! -d "/etc/letsencrypt/live/$(printenv ICECAST_HOSTNAME)" ]; then
           echo "certbot: No cert for $(printenv ICECAST_HOSTNAME) - attempting initial issuance"
-          certbot certonly --non-interactive --agree-tos --email "$(printenv STATION_ADMIN_EMAIL)" --webroot -w /var/www/certbot -d "$(printenv ICECAST_HOSTNAME)" || echo "Initial issuance failed"
+          certbot certonly \
+            --non-interactive \
+            --agree-tos \
+            --email "$(printenv STATION_ADMIN_EMAIL)" \
+            --webroot \
+            -w /var/www/certbot \
+            -d "$(printenv ICECAST_HOSTNAME)" \
+            || echo "Initial issuance failed"
           printf "%s\n" "$(date -u +%s)" > /etc/letsencrypt/.nginx-reload || true
         fi
 

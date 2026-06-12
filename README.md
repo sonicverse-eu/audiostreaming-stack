@@ -9,7 +9,7 @@
 > [!WARNING]
 > **Early Development — Not Production Ready.** This project is under active development. APIs, configuration, and behaviour may change without notice. Do not use in production environments without thorough evaluation and testing.
 
-Self-hosted Docker Compose stack for live radio streaming. Ingest from any studio encoder, deliver via Icecast2 and HLS adaptive bitrate, with automatic fallback, silence detection, PostHog analytics, Pushover alerts, and an optional real-time operator dashboard. The runtime services ship in one consolidated Docker image managed by a single container entrypoint.
+Self-hosted Docker Compose stack for live radio streaming. Ingest from any studio encoder, deliver via Icecast2 and HLS adaptive bitrate, with automatic fallback, silence detection, and an optional real-time operator dashboard. The runtime services ship in one consolidated Docker image managed by a single container entrypoint.
 
 ## Documentation
 
@@ -39,7 +39,7 @@ Studio (BUTT/etc)
                    │     │                 │
                    │     ▼                 │
                    │ Icecast2 ─► Nginx     │
-                   │ Analytics + API       │
+                   │ Status API            │
                    └──────────┬────────────┘
                               │
                          :80 / :443
@@ -53,7 +53,6 @@ Studio (BUTT/etc)
 | **Liquidsoap** | Stream processor — ingest, fallback chain, encoding, HLS |
 | **Nginx** | Public-facing reverse proxy + HLS segment serving |
 | **Status Panel** | Optional Flask API backend for the operator dashboard and service management |
-| **Analytics** | Polls Icecast stats and sends events to PostHog + Pushover alerts |
 | **Certbot** | Automatic Let's Encrypt certificate renewal with app reload signaling |
 
 ## Repository Structure
@@ -61,7 +60,7 @@ Studio (BUTT/etc)
 - `.github/` contains repository automation and project metadata, including issue templates and GitHub Actions workflows.
 - `.vscode/` contains editor settings and recommended workspace configuration for contributors using VS Code.
 - `apps/` contains operator-facing applications: the Next.js dashboard in `apps/dashboard/` and the Flask status API in `apps/status-api/`.
-- `services/` contains runtime service code grouped by domain: streaming services in `services/streaming/` and telemetry in `services/analytics/`.
+- `services/` contains runtime streaming service code under `services/streaming/`.
 - `infrastructure/` contains edge and routing infrastructure definitions, currently the Nginx reverse proxy in `infrastructure/nginx/`.
 - `Dockerfile` builds the unified runtime image and `scripts/unified-entrypoint.sh` supervises the processes inside the container.
 - `emergency-audio/` stores local fallback media used when both studio streams are unavailable (operator-created during setup).
@@ -134,7 +133,7 @@ This installs **only what's needed to run**:
 
 **What's _not_ installed:**
 - Node.js / npm (dashboard already built into image)
-- Python / pip (analytics & API already built into image)
+- Python / pip (status API already built into image)
 
 **Time:** ~2–5 minutes (mostly downloading the unified runtime image)
 
@@ -158,7 +157,7 @@ GHCR mirror name:
 
 ### 📦 Full development environment
 
-If you plan to modify the dashboard, analytics, or API:
+If you plan to modify the dashboard or API:
 
 **Via short link:**
 ```bash
@@ -174,7 +173,7 @@ cd audiostreaming-stack
 
 This includes everything above **plus**:
 - Node.js dependencies (dashboard development)
-- Python dependencies (analytics & API development)
+- Python dependencies (API development)
 
 **Time:** ~5–10 minutes depending on your network and system
 
@@ -264,7 +263,7 @@ Or use the equivalent alias:
 
 These scripts install (according to your needs):
 - **Node.js** dependencies for the dashboard (`apps/dashboard/`)
-- **Python** dependencies for analytics and status API (`services/analytics/`, `apps/status-api/`)
+- **Python** dependencies for the status API (`apps/status-api/`)
 
 **When to use:**
 - After a minimal deployment if you want to edit the dashboard or APIs
@@ -339,21 +338,19 @@ All settings are managed via `.env` (copy from `.env.example`):
 
 | Variable | Description |
 |---|---|
-| `STATION_NAME` | Station name (used in stream metadata and alerts) |
+| `STATION_NAME` | Station name (used in stream metadata) |
 | `STATION_LOCATION` | Station location (Icecast server info) |
 | `STATION_ADMIN_EMAIL` | Admin contact email |
 | `ICECAST_SOURCE_PASSWORD` | Password for Liquidsoap → Icecast connections |
-| `ICECAST_ADMIN_USER` | Icecast admin username for the status API and analytics |
+| `ICECAST_ADMIN_USER` | Icecast admin username for the status API |
 | `ICECAST_ADMIN_PASSWORD` | Icecast admin panel password |
 | `HARBOR_PASSWORD` | Password for studio → Liquidsoap connections |
 | `ICECAST_HOSTNAME` | Public hostname |
 | `ICECAST_MAX_LISTENERS` | Maximum concurrent listeners |
 | `LETSENCRYPT_EMAIL` | Email for Let's Encrypt notifications |
 | `LETSENCRYPT_STAGING` | Set to `1` for test certificates |
-| `PUSHOVER_USER_KEY` | Pushover user key for silence/failover alerts |
-| `PUSHOVER_APP_TOKEN` | Pushover application token |
 | `SILENCE_THRESHOLD_DB` | Silence detection threshold in dB (default: `-40`) |
-| `SILENCE_DURATION` | Seconds of silence before alerting (default: `15`) |
+| `SILENCE_DURATION` | Seconds of silence before detection (default: `15`) |
 | `ENABLE_STATUS_PANEL` | Set to `1` to expose the internal status API service through nginx |
 | `APPWRITE_ENDPOINT` | Optional Appwrite API endpoint for dashboard auth |
 | `APPWRITE_PROJECT_ID` | Optional Appwrite project ID |
@@ -362,11 +359,7 @@ All settings are managed via `.env` (copy from `.env.example`):
 | `STATUS_PANEL_HOST` | Optional bind host for status API (default: `127.0.0.1`; auto-uses container IP in Docker when unset) |
 | `STATUS_PANEL_WRITE_ROLES` | Appwrite team roles allowed to manage emergency audio (default: `owner,admin`) |
 | `STATUS_PANEL_ALLOW_RISKY_COMMANDS` | Enable remote restart/SSL renewal commands (`0` by default) |
-| `POSTHOG_API_KEY` | PostHog project API key |
-| `POSTHOG_HOST` | PostHog instance URL |
-| `POSTHOG_POLL_INTERVAL` | Stats polling interval in seconds (default: `30`) |
-
-The status API and analytics service now require `ICECAST_ADMIN_USER` and `ICECAST_ADMIN_PASSWORD`
+The status API now requires `ICECAST_ADMIN_USER` and `ICECAST_ADMIN_PASSWORD`
 to be set explicitly in `.env`; they no longer fall back to built-in example credentials.
 
 ## Status Panel
@@ -383,7 +376,6 @@ docker compose up -d --force-recreate app status-api
 - Live listener counts and mount point status (5s refresh)
 - Container health monitoring
 - Stack configuration overview
-- Recent alerts timeline
 - Emergency audio upload/management
 - Role-based write access
 
@@ -398,27 +390,6 @@ npm install && npm run build
 ```
 
 The API backend runs as an internal-only Compose service and is proxied through nginx at `https://<host>/api/`.
-
-## Analytics & Alerts
-
-The analytics service sends the following events to PostHog:
-
-- `stream_listeners` — per-mount listener count (every poll)
-- `stream_total_listeners` — aggregate listener count
-- `stream_source_connected` / `stream_source_disconnected` — mount online/offline
-- `stream_silence_detected` / `stream_silence_resolved` — dead air events
-
-### Pushover Alerts
-
-| Alert | Priority | Trigger |
-|---|---|---|
-| Silence detected | High (siren) | Audio below threshold for configured duration |
-| Audio resumed | Low | Audio returns after silence |
-| Stream outage | High (siren) | One or more Icecast outputs disconnect |
-| Primary harbor down | High (siren) | Primary studio input disconnects |
-| Secondary harbor down | High / Critical | Secondary disconnects; escalates when primary is also down |
-
-Alerts have a 5-minute cooldown to prevent spam.
 
 ## File Structure
 
@@ -445,9 +416,6 @@ Alerts have a 5-minute cooldown to prevent spam.
 │       ├── lib/
 │       └── package.json
 ├── services/
-│   ├── analytics/
-│   │   ├── requirements.txt
-│   │   └── tracker.py
 │   └── streaming/
 │       ├── icecast/
 │       │   └── icecast.xml
@@ -479,7 +447,7 @@ To reduce CI time and avoid unnecessary jobs, pull request checks are scoped by 
 
 - Documentation-only changes (`docs/**` or `**/*.md`) run only lightweight "docs-only" marker jobs and skip code/build jobs.
 - Lint workflow mapping:
-   - Python lint runs when `services/analytics/**`, `apps/status-api/**`, related Python requirements files, or `pyproject.toml` change.
+   - Python lint runs when `apps/status-api/**`, related Python requirements files, or `pyproject.toml` change.
    - TypeScript lint runs when `apps/dashboard/**` or its TypeScript, ESLint, Prettier, config, or lock files change.
    - Dockerfile lint runs when any `Dockerfile` or `docker-compose.yml` changes.
    - YAML lint runs when any `*.yml` or `*.yaml` changes, and validates all tracked YAML files in the repository.

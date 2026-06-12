@@ -3,14 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import {
-  type Alert,
   type CommandsConfig,
   type Container,
   type EmergencyFile,
   type StackConfig,
   type StreamStatus,
   deleteEmergencyAudio,
-  fetchAlerts,
   fetchCommandsConfig,
   fetchConfig,
   fetchContainers,
@@ -28,7 +26,6 @@ export function Dashboard() {
   const { user, jwt, logout } = useAuth();
   const [status, setStatus] = useState<StreamStatus | null>(null);
   const [config, setConfig] = useState<StackConfig | null>(null);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [containers, setContainers] = useState<Container[]>([]);
   const [emergencyFiles, setEmergencyFiles] = useState<EmergencyFile[]>([]);
   const [uploadStatus, setUploadStatus] = useState("");
@@ -39,14 +36,12 @@ export function Dashboard() {
 
   const refresh = useCallback(async () => {
     if (!jwt) return;
-    const [s, a, c, e] = await Promise.allSettled([
+    const [s, c, e] = await Promise.allSettled([
       fetchStatus(jwt),
-      fetchAlerts(jwt),
       fetchContainers(jwt),
       fetchEmergencyAudio(jwt),
     ]);
     if (s.status === "fulfilled") setStatus(s.value);
-    if (a.status === "fulfilled") setAlerts(a.value);
     if (c.status === "fulfilled" && Array.isArray(c.value))
       setContainers(c.value);
     if (e.status === "fulfilled") setEmergencyFiles(e.value);
@@ -332,11 +327,6 @@ export function Dashboard() {
                 ["Max Listeners", config.max_listeners],
                 ["Silence Threshold", `${config.silence_threshold_db} dB`],
                 ["Silence Duration", `${config.silence_duration_s}s`],
-                ["PostHog", config.posthog_enabled ? "Enabled" : "Disabled"],
-                [
-                  "Pushover Alerts",
-                  config.pushover_enabled ? "Enabled" : "Disabled",
-                ],
               ].map(([k, v]) => (
                 <li
                   key={k}
@@ -379,11 +369,9 @@ export function Dashboard() {
         <Card title="Databases & Storage">
           <ul>
             {[
-              ["PostHog", config?.posthog_enabled ? "Connected" : "Not configured"],
               ["Appwrite", "Connected (auth)"],
               ["Icecast Logs", "Docker volume"],
               ["HLS Segments", "Shared volume"],
-              ["Alert History", "In-memory (50 events)"],
             ].map(([k, v]) => (
               <li
                 key={k}
@@ -394,40 +382,6 @@ export function Dashboard() {
               </li>
             ))}
           </ul>
-        </Card>
-
-        {/* Alerts */}
-        <Card title="Recent Alerts" fullWidth>
-          <div className="max-h-72 overflow-y-auto">
-            {alerts.length === 0 ? (
-              <p className="text-sm text-[#8b90a0]">No alerts — all clear</p>
-            ) : (
-              alerts.map((a) => (
-                <div
-                  key={`${a.timestamp}-${a.type}-${a.message ?? ""}`}
-                  className="flex items-start gap-2 py-2 border-b border-[#2a2e3d] text-xs last:border-0"
-                >
-                  <span className="text-[#8b90a0] font-mono whitespace-nowrap">
-                    {new Date(a.timestamp * 1000).toLocaleTimeString()}
-                  </span>
-                  <span
-                    className={`font-semibold ${
-                      a.type.includes("silence_start") || a.type.includes("disconnected")
-                        ? "text-red-400"
-                        : a.type.includes("silence_end") || a.type.includes("connected")
-                        ? "text-emerald-400"
-                        : "text-amber-400"
-                    }`}
-                  >
-                    {a.type.replace(/_/g, " ")}
-                  </span>
-                  {a.message && (
-                    <span className="text-[#8b90a0]">{a.message}</span>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
         </Card>
 
         {/* Commands */}

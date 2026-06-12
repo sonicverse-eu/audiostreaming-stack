@@ -105,7 +105,6 @@ function Install-NodeDeps {
 function Install-PythonDeps {
     $pythonCmd = Get-PythonCommand
     $requirements = @(
-        (Join-Path $RootDir "services/analytics/requirements.txt"),
         (Join-Path $RootDir "apps/status-api/requirements.txt")
     )
 

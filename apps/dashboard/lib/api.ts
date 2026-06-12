@@ -49,15 +49,6 @@ export async function fetchStatus(jwt: string): Promise<StreamStatus> {
   return res.json();
 }
 
-export async function fetchAlerts(jwt: string): Promise<Alert[]> {
-  const res = await fetch(resolveApiUrl("/api/alerts"), {
-    headers: buildJsonHeaders(jwt),
-  });
-  if (res.status === 401) throw new Error("Unauthorized");
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
 export async function fetchContainers(jwt: string): Promise<Container[]> {
   const res = await fetch(resolveApiUrl("/api/containers"), {
     headers: buildJsonHeaders(jwt),
@@ -185,16 +176,8 @@ export interface StackConfig {
   silence_threshold_db: string;
   silence_duration_s: string;
   max_listeners: string;
-  posthog_enabled: boolean;
-  pushover_enabled: boolean;
   can_manage_emergency_audio: boolean;
   can_run_risky_commands: boolean;
-}
-
-export interface Alert {
-  type: string;
-  message: string;
-  timestamp: number;
 }
 
 export interface Container {

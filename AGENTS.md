@@ -19,13 +19,12 @@ Task tracking for this repository uses GitHub Issues. When work is tied to an is
 |---------|----------------|
 | `dashboard` | `cd apps/dashboard && npm install && npm run dev` |
 | `status-api` | Edit `apps/status-api/server.py`, then `docker compose restart status-api` |
-| `analytics` | Edit `services/analytics/tracker.py`, then `docker compose restart analytics` |
 | `liquidsoap` | Edit `services/streaming/liquidsoap/radio.liq`, then `docker compose restart liquidsoap` |
 | `nginx` | Edit `infrastructure/nginx/nginx.conf`, then `docker compose restart nginx` |
 
 ## Required Checks
 
-- Python changes: `ruff check services/analytics/ apps/status-api/`
+- Python changes: `ruff check apps/status-api/`
 - TypeScript changes: `cd apps/dashboard && npm run lint`
 - Dockerfile changes: `hadolint <Dockerfile>`
 - YAML changes: `yamllint -c .yamllint.yml docker-compose.yml .github/workflows/`

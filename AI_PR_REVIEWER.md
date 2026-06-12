@@ -3,7 +3,7 @@
 ## Purpose
 
 - Sonicverse is a self-hosted Docker Compose stack for live radio streaming.
-- It combines studio ingest, stream processing, listener delivery, health/status APIs, analytics, and operator tooling in one deployable repository.
+- It combines studio ingest, stream processing, listener delivery, health/status APIs, and operator tooling in one deployable repository.
 
 ## Architecture
 
@@ -12,7 +12,6 @@
 - `services/streaming/icecast/` serves as the streaming distribution layer for multiple public mount points.
 - `infrastructure/nginx/` is the public edge: reverse proxy, HLS serving, and TLS/bootstrap templating.
 - `apps/status-api/` is a Flask API that reads stream/container state and exposes authenticated operator actions.
-- `services/analytics/` polls Icecast, emits PostHog events, and sends Pushover alerts for outages and silence.
 - `apps/dashboard/` is a Next.js operator UI that talks to `status-api`; keep frontend assumptions aligned with API payloads.
 - Favor small, service-local changes over cross-cutting rewrites.
 
@@ -20,7 +19,6 @@
 
 - `apps/dashboard/`: Next.js dashboard UI, auth wiring, API client helpers, and TSX components.
 - `apps/status-api/`: Flask status/control API for the dashboard and operational endpoints.
-- `services/analytics/`: Python analytics and alerting worker.
 - `services/streaming/liquidsoap/`: Liquidsoap radio pipeline and streaming behavior.
 - `services/streaming/icecast/`: Icecast server image and config.
 - `infrastructure/nginx/`: Nginx config, HTML template, and container entrypoint.
@@ -28,20 +26,19 @@
 
 ## Stack
 
-- Python 3.12 services with Ruff linting in `apps/status-api/` and `services/analytics/`.
+- Python 3.12 services with Ruff linting in `apps/status-api/`.
 - Next.js 16, React 19, TypeScript, and ESLint in `apps/dashboard/`.
 - Docker Compose for local/prod orchestration.
 - Liquidsoap for ingest, fallback, transcoding, and HLS.
 - Icecast2 for stream distribution.
 - Nginx for reverse proxying and public delivery.
 - Appwrite for dashboard authentication/authorization.
-- PostHog and Pushover integrations for analytics and alerting.
 
 ## Testing
 
 - There is no dedicated unit/integration test suite in this repository today.
 - Treat lint and config validation as the enforced automated checks:
-- Python: `ruff check services/analytics/ apps/status-api/`
+- Python: `ruff check apps/status-api/`
 - TypeScript: `cd apps/dashboard && npm run lint`
 - Dockerfiles: `hadolint <Dockerfile>`
 - YAML: `yamllint -c .yamllint.yml docker-compose.yml .github/workflows/`
@@ -73,7 +70,6 @@
 - API payload changes in `apps/status-api/` can silently break the dashboard if matching TypeScript types/components are not updated.
 - Docker Compose, Nginx, and service env vars are tightly coupled; renames or default changes often require updates in multiple files.
 - The dashboard is operator-facing; auth and write-access checks must not be weakened when adding actions.
-- The analytics service mixes listener polling and alerting responsibilities; changes can affect observability and incident noise at the same time.
 
 ## Out Of Scope
 

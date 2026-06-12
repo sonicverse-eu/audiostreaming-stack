@@ -132,7 +132,6 @@ install_python_deps() {
     local python_bin
     local pip_args=("-m" "pip" "install")
     local requirements=(
-        "$ROOT_DIR/services/analytics/requirements.txt"
         "$ROOT_DIR/apps/status-api/requirements.txt"
     )
 

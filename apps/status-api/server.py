@@ -2,18 +2,16 @@
 Sonicverse Status Panel — API backend
 
 Serves an optional real-time dashboard showing stream health, listener
-counts, source status, alert history, configuration, and container status.
+counts, source status, configuration, and container status.
 Can be protected by Appwrite authentication.
 """
 
 import functools
-import ipaddress
 import json
 import os
 import shutil
 import socket
 import time
-from collections import deque
 from pathlib import Path
 
 import docker
@@ -54,10 +52,6 @@ WRITE_ROLES = {
 if not WRITE_ROLES:
     WRITE_ROLES = {"owner", "admin"}
 ALLOW_RISKY_COMMANDS = os.getenv("STATUS_PANEL_ALLOW_RISKY_COMMANDS", "0") == "1"
-
-# Alert history (last 50 events, in-memory)
-alert_history = deque(maxlen=50)
-
 
 def get_bearer_jwt():
     auth_header = request.headers.get("Authorization", "")
@@ -159,24 +153,6 @@ def has_operator_access(context):
         return False
 
     return bool(context.get("roles", set()) & WRITE_ROLES)
-
-
-def get_originating_ip():
-    # Nginx appends the real client IP to X-Forwarded-For via $proxy_add_x_forwarded_for.
-    xff = request.headers.get("X-Forwarded-For", "")
-    if xff:
-        parts = [part.strip() for part in xff.split(",") if part.strip()]
-        if parts:
-            return parts[-1]
-    return request.remote_addr or ""
-
-
-def is_private_or_loopback_ip(ip_addr):
-    try:
-        parsed = ipaddress.ip_address(ip_addr)
-    except ValueError:
-        return False
-    return parsed.is_private or parsed.is_loopback
 
 
 def get_bind_host():
@@ -328,31 +304,6 @@ def api_auth_config():
     })
 
 
-@app.route("/api/alert", methods=["POST", "GET"])
-def api_alert():
-    """Receive alerts from the analytics service or Liquidsoap (internal only).
-    Only accepts requests from Docker internal network (non-routable IPs)."""
-    if request.headers.get("X-Internal-Alert") == "1":
-        trusted_proxy = True
-    else:
-        trusted_proxy = is_private_or_loopback_ip(get_originating_ip())
-
-    if not trusted_proxy:
-        return Response(json.dumps({"error": "Forbidden"}), 403,
-                        {"Content-Type": "application/json"})
-
-    alert_type = request.args.get("type", "unknown")
-    message = request.args.get("message", "")
-
-    alert = {
-        "type": alert_type,
-        "message": message,
-        "timestamp": int(time.time()),
-    }
-    alert_history.appendleft(alert)
-    return jsonify({"ok": True})
-
-
 # ============================================================
 # Routes — authenticated
 # ============================================================
@@ -380,17 +331,9 @@ def api_config():
         "silence_threshold_db": os.getenv("SILENCE_THRESHOLD_DB", "-40"),
         "silence_duration_s": os.getenv("SILENCE_DURATION", "15"),
         "max_listeners": os.getenv("ICECAST_MAX_LISTENERS", "500"),
-        "posthog_enabled": bool(os.getenv("POSTHOG_API_KEY")),
-        "pushover_enabled": bool(os.getenv("PUSHOVER_USER_KEY")),
         "can_manage_emergency_audio": can_manage_emergency_audio,
         "can_run_risky_commands": can_run_risky_commands,
     })
-
-
-@app.route("/api/alerts")
-@require_auth
-def api_alerts():
-    return jsonify(list(alert_history))
 
 
 @app.route("/api/containers")
@@ -528,14 +471,6 @@ def api_emergency_audio_upload():
         shutil.copy2(target, backup)
 
     file.save(str(target))
-
-    # Log the change
-    alert = {
-        "type": "emergency_audio_updated",
-        "message": f"Emergency audio updated: {file.filename} ({target.stat().st_size / (1024*1024):.1f} MB)",
-        "timestamp": int(time.time()),
-    }
-    alert_history.appendleft(alert)
 
     return jsonify({"ok": True, "filename": target.name, "size_bytes": target.stat().st_size})
 

@@ -33,9 +33,7 @@ jobs:
               - 'docs/**'
               - '**/*.md'
             python:
-              - 'services/analytics/**/*.py'
               - 'apps/status-api/**/*.py'
-              - 'services/analytics/requirements.txt'
               - 'apps/status-api/requirements.txt'
               - 'pyproject.toml'
             typescript:
@@ -107,7 +105,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
       - uses: astral-sh/ruff-action@4919ec5cf1f49eff0871dbcea0da843445b837e6  # v3
         with:
-          args: "check services/analytics/ apps/status-api/"
+          args: "check apps/status-api/"
 
   typescript:
     name: TypeScript (ESLint)

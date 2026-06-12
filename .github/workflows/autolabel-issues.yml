@@ -61,7 +61,6 @@ jobs:
               'Scope: nginx',
               'Scope: status-api',
               'Scope: dashboard',
-              'Scope: analytics',
               'Scope: docker',
               'Scope: ci',
             ];
@@ -87,7 +86,7 @@ jobs:
             // ── Call GitHub Models API ────────────────────────────────────────────
             const prompt = [
               'You are a GitHub issue labeler for an audiostreaming Docker stack project.',
-              'The project services are: icecast, liquidsoap, nginx, status-api, dashboard, analytics.',
+              'The project services are: icecast, liquidsoap, nginx, status-api, dashboard.',
               '',
               'Given the issue below, reply with a JSON object with these exact keys:',
               '  "type"     – exactly one value from: ' + TYPE_LABELS.join(', '),

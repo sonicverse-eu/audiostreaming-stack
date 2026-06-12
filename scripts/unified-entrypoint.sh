@@ -182,8 +182,6 @@ trap stop_services EXIT TERM INT
 start_service icecast icecast2 -c /etc/icecast2/icecast.xml
 wait_for_url icecast "http://127.0.0.1:8000/status-json.xsl"
 
-start_service analytics python -u /opt/sonicverse/analytics/tracker.py
-
 start_service liquidsoap liquidsoap /etc/liquidsoap/radio.liq
 start_service nginx nginx -g "daemon off;"
 start_service certificate-watch watch_certificate_updates

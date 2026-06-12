@@ -15,7 +15,6 @@ harbor_password = environment.get(default="changeme", "HARBOR_PASSWORD")
 icecast_pass = environment.get(default="changeme", "ICECAST_SOURCE_PASSWORD")
 icecast_host = environment.get(default="127.0.0.1", "ICECAST_INTERNAL_HOST")
 icecast_port = 8000
-analytics_alert_url = environment.get(default="http://127.0.0.1:8888", "ANALYTICS_ALERT_URL")
 
 # --- Inputs from studio ---
 
@@ -30,12 +29,10 @@ primary = input.harbor(
 
 primary.on_connect(synchronous=false, fun (_) -> begin
   log("OK: Primary harbor connected")
-  ignore(process.run("wget -q -O /dev/null '#{analytics_alert_url}/alert?type=harbor_primary_up'"))
 end)
 
 primary.on_disconnect(synchronous=false, fun () -> begin
   log("ALERT: Primary harbor disconnected")
-  ignore(process.run("wget -q -O /dev/null '#{analytics_alert_url}/alert?type=harbor_primary_down'"))
 end)
 
 # Fallback: lower bitrate Ogg stream
@@ -49,12 +46,10 @@ secondary = input.harbor(
 
 secondary.on_connect(synchronous=false, fun (_) -> begin
   log("OK: Secondary harbor connected")
-  ignore(process.run("wget -q -O /dev/null '#{analytics_alert_url}/alert?type=harbor_secondary_up'"))
 end)
 
 secondary.on_disconnect(synchronous=false, fun () -> begin
   log("ALERT: Secondary harbor disconnected")
-  ignore(process.run("wget -q -O /dev/null '#{analytics_alert_url}/alert?type=harbor_secondary_down'"))
 end)
 
 # --- Emergency fallback ---
@@ -80,7 +75,7 @@ radio = buffer(buffer=6.0, max=25.0, radio)
 # Guarantee infallible source after all processing
 radio = mksafe(radio)
 
-# --- Silence detection + Pushover alerts ---
+# --- Silence detection ---
 silence_threshold = float_of_string(environment.get(default="-40", "SILENCE_THRESHOLD_DB"))
 silence_duration = float_of_string(environment.get(default="15", "SILENCE_DURATION"))
 
@@ -92,12 +87,10 @@ radio = blank.detect(
 
 radio.on_blank(synchronous=false, fun () -> begin
   log("ALERT: Silence detected for #{silence_duration}s (threshold: #{silence_threshold}dB)")
-  ignore(process.run("wget -q -O /dev/null '#{analytics_alert_url}/alert?type=silence_start'"))
 end)
 
 radio.on_noise(synchronous=false, fun () -> begin
   log("OK: Audio resumed after silence")
-  ignore(process.run("wget -q -O /dev/null '#{analytics_alert_url}/alert?type=silence_end'"))
 end)
 
 # --- Icecast outputs (multiple bitrates/formats) ---
