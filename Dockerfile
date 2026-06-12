@@ -31,10 +31,9 @@ COPY apps/status-api/requirements.txt /tmp/status-api-requirements.txt
 COPY services/analytics/requirements.txt /tmp/analytics-requirements.txt
 
 RUN python3 -m venv "$VIRTUAL_ENV" \
-    && pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir \
-        -r /tmp/status-api-requirements.txt \
-        -r /tmp/analytics-requirements.txt
+        --requirement /tmp/status-api-requirements.txt \
+        --requirement /tmp/analytics-requirements.txt
 
 FROM base AS runtime
 
