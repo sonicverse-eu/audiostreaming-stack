@@ -80,7 +80,7 @@ jobs:
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a  # v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@4c0219f9b9c65bba36e54bc9a7e94f78d87ece94  # v3
 
       - name: Validate Docker Hub credentials
         if: github.event_name == 'push'
