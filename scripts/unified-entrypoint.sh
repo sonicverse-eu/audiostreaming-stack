@@ -18,6 +18,10 @@ RELOADING=0
 
 ICECAST_PID=""
 LIQUIDSOAP_PID=""
+LIQUIDSOAP_CONFIG="/etc/liquidsoap/radio.liq"
+ICECAST_TEMPLATE="/etc/icecast2/icecast.xml.template"
+ICECAST_CONFIG="/etc/icecast2/icecast.xml"
+STACK_APPLY_STATUS="/etc/sonicverse/stack.apply.json"
 
 log() {
     echo "[entrypoint] $*"
@@ -188,6 +192,66 @@ stop_pid() {
     fi
 }
 
+backup_streaming_configs() {
+    local path
+
+    for path in "$LIQUIDSOAP_CONFIG" "$ICECAST_TEMPLATE" "$ICECAST_CONFIG"; do
+        if [[ -f "$path" ]]; then
+            cp "$path" "${path}.bak"
+        fi
+    done
+}
+
+restore_streaming_configs() {
+    local path
+
+    for path in "$LIQUIDSOAP_CONFIG" "$ICECAST_TEMPLATE" "$ICECAST_CONFIG"; do
+        if [[ -f "${path}.bak" ]]; then
+            cp "${path}.bak" "$path"
+        fi
+    done
+}
+
+write_stack_apply_status() {
+    local state="$1"
+    local error_message="${2:-supervised reload failed}"
+    local temp="${STACK_APPLY_STATUS}.tmp.$$"
+    local timestamp
+
+    timestamp="$(date +%s)"
+    mkdir -p "$(dirname "$STACK_APPLY_STATUS")"
+
+    if [[ "$state" == "applied" ]]; then
+        printf '{"state":"applied","updated_at":%s}\n' "$timestamp" > "$temp"
+    else
+        printf '{"state":"failed","error":"%s","updated_at":%s}\n' \
+            "$error_message" "$timestamp" > "$temp"
+    fi
+    mv "$temp" "$STACK_APPLY_STATUS"
+}
+
+start_streaming_services() {
+    icecast2 -c "$ICECAST_CONFIG" &
+    ICECAST_PID="$!"
+    update_service_pid "icecast" "$ICECAST_PID"
+
+    if ! wait_for_url icecast "http://127.0.0.1:8000/status-json.xsl"; then
+        return 1
+    fi
+
+    liquidsoap "$LIQUIDSOAP_CONFIG" &
+    LIQUIDSOAP_PID="$!"
+    update_service_pid "liquidsoap" "$LIQUIDSOAP_PID"
+    return 0
+}
+
+rollback_streaming_services() {
+    log "Restarting previous streaming services after reload failure"
+    stop_pid "$ICECAST_PID" "icecast"
+    restore_streaming_configs
+    start_streaming_services
+}
+
 validate_streaming_config() {
     if ! liquidsoap --check /etc/liquidsoap/radio.liq; then
         log "Liquidsoap config validation failed"
@@ -206,9 +270,16 @@ reload_streaming_services() {
     log "Supervised streaming reload requested"
     RELOADING=1
 
-    render_stack_config
+    backup_streaming_configs
+
+    if ! render_stack_config; then
+        restore_streaming_configs
+        RELOADING=0
+        return 1
+    fi
 
     if ! validate_streaming_config; then
+        restore_streaming_configs
         RELOADING=0
         return 1
     fi
@@ -216,18 +287,11 @@ reload_streaming_services() {
     stop_pid "$LIQUIDSOAP_PID" "liquidsoap"
     stop_pid "$ICECAST_PID" "icecast"
 
-    icecast2 -c /etc/icecast2/icecast.xml &
-    ICECAST_PID="$!"
-    update_service_pid "icecast" "$ICECAST_PID"
-
-    if ! wait_for_url icecast "http://127.0.0.1:8000/status-json.xsl"; then
+    if ! start_streaming_services; then
+        rollback_streaming_services || true
         RELOADING=0
         return 1
     fi
-
-    liquidsoap /etc/liquidsoap/radio.liq &
-    LIQUIDSOAP_PID="$!"
-    update_service_pid "liquidsoap" "$LIQUIDSOAP_PID"
 
     if nginx -t; then
         nginx -s reload || true
@@ -252,11 +316,9 @@ watch_reload_requests() {
         if [[ "$current_marker" != "$last_marker" ]]; then
             last_marker="$current_marker"
             if reload_streaming_services; then
-                printf '{"state":"applied","updated_at":%s}\n' "$(date +%s)" \
-                    > /etc/sonicverse/stack.apply.json
+                write_stack_apply_status "applied"
             else
-                printf '{"state":"failed","error":"supervised reload failed","updated_at":%s}\n' "$(date +%s)" \
-                    > /etc/sonicverse/stack.apply.json
+                write_stack_apply_status "failed" "supervised reload failed"
             fi
         fi
     done

@@ -49,6 +49,24 @@ class StackSchemaTests(unittest.TestCase):
         errors = validate_stack_config(config)
         self.assertIn("At least one ingest must be enabled", errors)
 
+    def test_rejects_invalid_hls_playlist(self):
+        config = load_defaults()
+        config["hls"]["playlist"] = 'stream"><script>alert(1)</script>'
+        errors = validate_stack_config(config)
+        self.assertTrue(any("hls.playlist" in error for error in errors))
+
+    def test_rejects_null_output_samplerate(self):
+        config = load_defaults()
+        config["outputs"][0]["samplerate"] = None
+        errors = validate_stack_config(config)
+        self.assertTrue(any("samplerate" in error for error in errors))
+
+    def test_rejects_invalid_ingest_id(self):
+        config = load_defaults()
+        config["ingests"][0]["id"] = "my-ingest"
+        errors = validate_stack_config(config)
+        self.assertTrue(any("ingests.0.id" in error for error in errors))
+
 
 class StackRenderTests(unittest.TestCase):
     def setUp(self):

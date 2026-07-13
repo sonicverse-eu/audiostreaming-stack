@@ -5,6 +5,8 @@ import os
 import re
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+
 MOUNT_PATTERN = re.compile(r"^/[a-z0-9-]+$")
 ICECAST_CODECS = {"mp3", "fdkaac", "vorbis"}
 
@@ -54,6 +56,18 @@ def _validate_unique(values, field_name, errors):
         seen.add(value)
 
 
+def _format_schema_error(error):
+    path = ".".join(str(part) for part in error.absolute_path)
+    location = path or "config"
+    return f"{location}: {error.message}"
+
+
+def _validate_against_schema(config, errors):
+    validator = Draft202012Validator(load_schema())
+    for error in sorted(validator.iter_errors(config), key=lambda item: list(item.absolute_path)):
+        errors.append(_format_schema_error(error))
+
+
 def validate_stack_config(config, allowed_ports=None):
     """Validate stack config against schema and business rules."""
     errors = []
@@ -61,20 +75,15 @@ def validate_stack_config(config, allowed_ports=None):
     if not isinstance(config, dict):
         return ["Config must be a JSON object"]
 
-    if config.get("version") != 1:
-        errors.append("Unsupported config version (expected 1)")
-
-    ingests = config.get("ingests")
-    outputs = config.get("outputs")
-    hls = config.get("hls")
-    processing = config.get("processing")
-
-    for key in ("ingests", "outputs", "hls", "processing"):
-        if key not in config:
-            errors.append(f"Missing required field: {key}")
+    _validate_against_schema(config, errors)
 
     if errors:
         return errors
+
+    ingests = config["ingests"]
+    outputs = config["outputs"]
+    hls = config["hls"]
+    processing = config["processing"]
 
     allowed_ports = allowed_ports or get_allowed_ingest_ports()
 
@@ -86,8 +95,6 @@ def validate_stack_config(config, allowed_ports=None):
     _validate_unique([item.get("port") for item in ingests], "ingest port", errors)
 
     for ingest in ingests:
-        if ingest.get("type") != "harbor":
-            errors.append(f"Ingest {ingest.get('id')}: unsupported type")
         port = ingest.get("port")
         if port not in allowed_ports:
             errors.append(
@@ -102,14 +109,6 @@ def validate_stack_config(config, allowed_ports=None):
 
     _validate_unique([item.get("id") for item in outputs], "output id", errors)
     _validate_unique([item.get("mount") for item in outputs if item.get("enabled")], "mount", errors)
-
-    for output in outputs:
-        mount = output.get("mount", "")
-        if not MOUNT_PATTERN.match(mount):
-            errors.append(f"Output {output.get('id')}: invalid mount name {mount}")
-        codec = output.get("codec")
-        if codec not in ICECAST_CODECS:
-            errors.append(f"Output {output.get('id')}: unsupported codec {codec}")
 
     if hls.get("enabled"):
         _validate_unique([item.get("id") for item in hls.get("variants", [])], "HLS variant id", errors)
