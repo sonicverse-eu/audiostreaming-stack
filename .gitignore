@@ -5,3 +5,6 @@ emergency-audio/*.wav
 logs/
 hls-data/
 certbot/
+stack-config/*.json
+stack-config/*.json.bak
+stack-config/*.json.tmp

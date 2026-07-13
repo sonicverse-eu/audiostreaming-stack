@@ -359,6 +359,10 @@ All settings are managed via `.env` (copy from `.env.example`):
 | `STATUS_PANEL_HOST` | Optional bind host for status API (default: `127.0.0.1`; auto-uses container IP in Docker when unset) |
 | `STATUS_PANEL_WRITE_ROLES` | Appwrite team roles allowed to manage emergency audio (default: `owner,admin`) |
 | `STATUS_PANEL_ALLOW_RISKY_COMMANDS` | Enable remote restart/SSL renewal commands (`0` by default) |
+| `STACK_CONFIG_PATH` | Canonical stack config file on the shared volume (default: `/etc/sonicverse/stack.json`) |
+| `STACK_ALLOWED_INGEST_PORTS` | Harbor ports the control plane may assign to ingests (default: `8010,8011`) |
+| `STACK_APPLY_TIMEOUT_S` | Max wait for supervised streaming reload (default: `120`) |
+
 The status API now requires `ICECAST_ADMIN_USER` and `ICECAST_ADMIN_PASSWORD`
 to be set explicitly in `.env`; they no longer fall back to built-in example credentials.
 
@@ -378,6 +382,26 @@ docker compose up -d --force-recreate app status-api
 - Stack configuration overview
 - Emergency audio upload/management
 - Role-based write access
+- Stack config control plane API (`/api/stack/*`) for dynamic ingests, outputs, and apply/reload
+
+### Stack config control plane
+
+When `ENABLE_STATUS_PANEL=1`, operators can manage runtime streaming topology through the status API:
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/stack/schema` | GET | JSON schema and allowed codec/port enums |
+| `/api/stack/config` | GET/PUT | Read or replace canonical stack config |
+| `/api/stack/ingests/{id}` | PATCH/DELETE | Update or remove harbor ingests |
+| `/api/stack/outputs` | POST | Add a new Icecast output |
+| `/api/stack/outputs/{id}` | PATCH/DELETE | Change stream quality or remove output |
+| `/api/stack/apply` | POST | Validate and apply config via supervised reload |
+| `/api/stack/apply/status` | GET | Apply state machine status |
+| `/api/stack/health` | GET | Compare desired vs effective Icecast mounts |
+
+Canonical config is stored in `./stack-config/stack.json` (bind-mounted to `/etc/sonicverse`). On first boot the stack seeds defaults matching the static topology. Applying changes triggers a supervised Icecast/Liquidsoap reload inside the app container (~5–15s brief interruption).
+
+**v1 limitations:** host port binding changes for new ingests still require updating `.env` and recreating Compose port mappings; mount removal drops active listeners without drain.
 
 ### Deployment on Appwrite Sites
 

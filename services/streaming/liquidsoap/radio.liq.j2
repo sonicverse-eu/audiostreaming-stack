@@ -1,0 +1,132 @@
+# ============================================================
+# Liquidsoap Configuration (generated from stack config)
+# ============================================================
+
+# --- Settings ---
+settings.harbor.bind_addrs.set(["0.0.0.0"])
+settings.log.level.set(3)
+settings.init.allow_root.set(true)
+
+# Frame & buffering settings for stability
+settings.frame.duration.set(0.04)
+
+station_name = environment.get(default="Radio Station", "STATION_NAME")
+harbor_password = environment.get(default="changeme", "HARBOR_PASSWORD")
+icecast_pass = environment.get(default="changeme", "ICECAST_SOURCE_PASSWORD")
+icecast_host = environment.get(default="127.0.0.1", "ICECAST_INTERNAL_HOST")
+icecast_port = 8000
+
+# --- Inputs from studio ---
+{% for ingest in ingests | sort(attribute='priority') %}
+{% if ingest.enabled %}
+{{ ingest.id }} = input.harbor(
+  "{{ ingest.id }}",
+  port={{ ingest.port }},
+  password=harbor_password,
+  max=45.0,
+  buffer=15.0
+)
+
+{{ ingest.id }}.on_connect(synchronous=false, fun (_) -> begin
+  log("OK: {{ ingest.id | capitalize }} harbor connected")
+end)
+
+{{ ingest.id }}.on_disconnect(synchronous=false, fun () -> begin
+  log("ALERT: {{ ingest.id | capitalize }} harbor disconnected")
+end)
+{% endif %}
+{% endfor %}
+
+# --- Emergency fallback ---
+emergency = playlist("/emergency-audio", mode="normal", reload_mode="watch", reload=5)
+silence = blank()
+
+# --- Fallback chain ---
+radio = fallback(
+  track_sensitive=false,
+  [{% for ingest in ingests | sort(attribute='priority') %}{% if ingest.enabled %}{{ ingest.id }}, {% endif %}{% endfor %}emergency, silence]
+)
+
+radio = crossfade(duration={{ processing.crossfade_seconds }}, radio)
+
+radio = buffer(buffer={{ processing.buffer_seconds }}, max={{ processing.max_buffer_seconds }}, radio)
+
+radio = mksafe(radio)
+
+# --- Silence detection ---
+silence_threshold = float_of_string(environment.get(default="-40", "SILENCE_THRESHOLD_DB"))
+silence_duration = float_of_string(environment.get(default="15", "SILENCE_DURATION"))
+
+radio = blank.detect(
+  radio,
+  max_blank=silence_duration,
+  threshold=silence_threshold
+)
+
+radio.on_blank(synchronous=false, fun () -> begin
+  log("ALERT: Silence detected for #{silence_duration}s (threshold: #{silence_threshold}dB)")
+end)
+
+radio.on_noise(synchronous=false, fun () -> begin
+  log("OK: Audio resumed after silence")
+end)
+
+# --- Icecast outputs ---
+{% for output in outputs %}
+{% if output.enabled %}
+{% if output.codec == 'mp3' %}
+output.icecast(
+  %mp3(bitrate={{ output.bitrate }}, samplerate={{ output.samplerate }}, stereo={{ 'true' if output.channels == 2 else 'false' }}),
+  host=icecast_host, port=icecast_port,
+  password=icecast_pass,
+  mount="{{ output.mount }}",
+  name="#{station_name} - MP3 {{ output.bitrate }}k",
+  description=station_name,
+  radio
+)
+{% elif output.codec == 'fdkaac' %}
+output.icecast(
+  %fdkaac(bitrate={{ output.bitrate }}, channels={{ output.channels }}, samplerate={{ output.samplerate }}),
+  host=icecast_host, port=icecast_port,
+  password=icecast_pass,
+  mount="{{ output.mount }}",
+  name="#{station_name} - AAC {{ output.bitrate }}k",
+  description=station_name,
+  radio
+)
+{% elif output.codec == 'vorbis' %}
+output.icecast(
+  %vorbis.cbr(bitrate={{ output.bitrate }}, channels={{ output.channels }}, samplerate={{ output.samplerate }}),
+  host=icecast_host, port=icecast_port,
+  password=icecast_pass,
+  mount="{{ output.mount }}",
+  name="#{station_name} - Ogg {{ output.bitrate }}k",
+  description=station_name,
+  radio
+)
+{% endif %}
+{% endif %}
+{% endfor %}
+
+# --- HLS output ---
+{% if hls.enabled and hls.variants %}
+output.file.hls(
+  "/hls",
+  segment_duration={{ hls.segment_duration }},
+  segments=6,
+  segments_overhead=12,
+  perm=0o644,
+  playlist="{{ hls.playlist }}",
+  [
+{% for variant in hls.variants %}
+    ("{{ variant.id }}",
+      %ffmpeg(format="mpegts",
+        %audio(codec="aac", b="{{ variant.bitrate }}k", channels=2, ar=44100)
+      )
+    ){% if not loop.last %},{% endif %}
+
+{% endfor %}
+  ],
+  radio
+)
+{% endif %}

@@ -1,0 +1,23 @@
+        <div class="section-title">Available Streams</div>
+        <div class="endpoints-grid">
+{% for output in outputs %}
+{% if output.enabled %}
+            <a href="/listen{{ output.mount }}" class="endpoint-card" target="_blank" rel="noopener noreferrer">
+                <div class="endpoint-info">
+                    <h3>{{ output.label }}</h3>
+                    <p>{{ output.description }}</p>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+{% endif %}
+{% endfor %}
+{% if hls.enabled %}
+            <a href="/hls/{{ hls.playlist }}" class="endpoint-card" target="_blank" rel="noopener noreferrer">
+                <div class="endpoint-info">
+                    <h3>HLS Stream</h3>
+                    <p>Adaptive bitrate • Modern web players</p>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+{% endif %}
+        </div>

@@ -19,6 +19,7 @@ import requests
 from docker.errors import DockerException, NotFound
 from flask import Flask, Response, g, jsonify, request
 from flask_cors import CORS
+from stack.routes import register_stack_routes
 from werkzeug.exceptions import RequestEntityTooLarge
 
 app = Flask(__name__)
@@ -733,6 +734,19 @@ def api_commands_run():
     except Exception:
         app.logger.exception("Unexpected command execution failure for %s (%s)", command_id, service)
         return jsonify({"error": "Unexpected command failure"}), 500
+
+
+# ============================================================
+# Stack config control plane
+# ============================================================
+
+register_stack_routes(
+    app,
+    require_auth=require_auth,
+    require_operator=require_operator,
+    fetch_icecast_stats=fetch_icecast_stats,
+    parse_stats=parse_stats,
+)
 
 
 # ============================================================
