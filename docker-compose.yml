@@ -33,6 +33,7 @@ services:
     volumes:
       - hls-data:/hls
       - icecast-logs:/var/log/icecast2
+      - ./stack-config:/etc/sonicverse
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
       - ./emergency-audio:/emergency-audio
@@ -69,8 +70,13 @@ services:
       - STATUS_PANEL_WRITE_ROLES=${STATUS_PANEL_WRITE_ROLES:-owner,admin}
       - STATUS_PANEL_ALLOW_RISKY_COMMANDS=${STATUS_PANEL_ALLOW_RISKY_COMMANDS:-0}
       - EMERGENCY_AUDIO_DIR=/emergency-audio
+      - STACK_CONFIG_PATH=/etc/sonicverse/stack.json
+      - STACK_APPLY_STATUS_PATH=/etc/sonicverse/stack.apply.json
+      - STACK_ALLOWED_INGEST_PORTS=${STACK_ALLOWED_INGEST_PORTS:-8010,8011}
+      - STACK_APPLY_TIMEOUT_S=${STACK_APPLY_TIMEOUT_S:-120}
     volumes:
       - ./emergency-audio:/emergency-audio
+      - ./stack-config:/etc/sonicverse
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - streaming

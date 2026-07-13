@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "ingests": [
+    {
+      "id": "primary",
+      "type": "harbor",
+      "port": 8010,
+      "priority": 1,
+      "enabled": true
+    },
+    {
+      "id": "secondary",
+      "type": "harbor",
+      "port": 8011,
+      "priority": 2,
+      "enabled": true
+    }
+  ],
+  "outputs": [
+    {
+      "id": "mp3-128",
+      "type": "icecast",
+      "mount": "/stream-mp3-128",
+      "codec": "mp3",
+      "bitrate": 128,
+      "samplerate": 44100,
+      "channels": 2,
+      "enabled": true
+    },
+    {
+      "id": "mp3-192",
+      "type": "icecast",
+      "mount": "/stream-mp3-192",
+      "codec": "mp3",
+      "bitrate": 192,
+      "samplerate": 44100,
+      "channels": 2,
+      "enabled": true
+    },
+    {
+      "id": "mp3-320",
+      "type": "icecast",
+      "mount": "/stream-mp3-320",
+      "codec": "mp3",
+      "bitrate": 320,
+      "samplerate": 44100,
+      "channels": 2,
+      "enabled": true
+    },
+    {
+      "id": "aac-128",
+      "type": "icecast",
+      "mount": "/stream-aac-128",
+      "codec": "fdkaac",
+      "bitrate": 128,
+      "samplerate": 44100,
+      "channels": 2,
+      "enabled": true
+    },
+    {
+      "id": "aac-192",
+      "type": "icecast",
+      "mount": "/stream-aac-192",
+      "codec": "fdkaac",
+      "bitrate": 192,
+      "samplerate": 44100,
+      "channels": 2,
+      "enabled": true
+    },
+    {
+      "id": "ogg-128",
+      "type": "icecast",
+      "mount": "/stream-ogg-128",
+      "codec": "vorbis",
+      "bitrate": 128,
+      "samplerate": 44100,
+      "channels": 2,
+      "enabled": true
+    }
+  ],
+  "hls": {
+    "enabled": true,
+    "playlist": "live.m3u8",
+    "segment_duration": 4.0,
+    "variants": [
+      {
+        "id": "aac_64",
+        "bitrate": 64
+      },
+      {
+        "id": "aac_128",
+        "bitrate": 128
+      },
+      {
+        "id": "aac_256",
+        "bitrate": 256
+      }
+    ]
+  },
+  "processing": {
+    "crossfade_seconds": 0.35,
+    "buffer_seconds": 6.0,
+    "max_buffer_seconds": 25.0
+  }
+}

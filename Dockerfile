@@ -73,14 +73,21 @@ RUN apt-get update \
     && chmod 0777 /hls
 
 COPY --from=python-deps /opt/venv /opt/venv
-COPY apps/status-api/server.py /opt/sonicverse/status-api/server.py
-COPY services/streaming/icecast/icecast.xml /etc/icecast2/icecast.xml.template
-COPY services/streaming/liquidsoap/radio.liq /etc/liquidsoap/radio.liq
+COPY apps/status-api/ /opt/sonicverse/status-api/
+COPY config/stack.schema.json /opt/sonicverse/config/stack.schema.json
+COPY config/stack.defaults.json /opt/sonicverse/config/stack.defaults.json
+COPY services/streaming/icecast/icecast.xml.j2 /etc/icecast2/icecast.xml.template
+COPY services/streaming/liquidsoap/radio.liq.j2 /etc/liquidsoap/radio.liq.j2
 COPY infrastructure/nginx/nginx.conf /etc/nginx/nginx.conf.template
 COPY infrastructure/nginx/index.html.template /etc/nginx/index.html.template
+COPY infrastructure/nginx/index.streams.html.j2 /etc/nginx/index.streams.html.j2
 COPY scripts/unified-entrypoint.sh /usr/local/bin/sonicverse-entrypoint
+COPY scripts/request-streaming-reload.sh /usr/local/bin/request-streaming-reload.sh
+COPY scripts/render-stack-config.sh /usr/local/bin/render-stack-config.sh
 
-RUN chmod 0755 /usr/local/bin/sonicverse-entrypoint
+RUN chmod 0755 /usr/local/bin/sonicverse-entrypoint \
+    /usr/local/bin/request-streaming-reload.sh \
+    /usr/local/bin/render-stack-config.sh
 
 EXPOSE 80 443 8000 8010 8011 8080
 
